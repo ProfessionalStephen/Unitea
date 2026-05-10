@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 
 // ─────────────────────────────────────────────
 // THEME
@@ -175,16 +175,16 @@ function mB(r){var t=RT[r];if(!t)return Object.keys(BOARDS);return t.boards==="a
 function mK(r){return RT[r]?RT[r].kpis:[];}
 
 const TEAM_INIT=[
-  {id:1,name:"Jordan Lee",title:"Owner",role:"Owner",email:"",manager:"",region:"Both",boards:mB("Owner"),kpis:mK("Owner"),nested:true,sendFreq:"daily",hours:"24/7"},
-  {id:2,name:"Mallory Amend",title:"COO",role:"COO",email:"",manager:"Dan",region:"Both",boards:mB("COO"),kpis:mK("COO"),nested:true,sendFreq:"daily",hours:"24/7"},
-  {id:30,name:"Josh Labarre",title:"VP of Operations",role:"VP of Operations",email:"",manager:"Mallory",region:"Both",boards:mB("VP of Operations"),kpis:mK("VP of Operations"),nested:true,sendFreq:"daily",hours:"24/7"},
-  {id:3,name:"Julie Schultz",title:"Office Manager",role:"Office Manager",email:"",manager:"Mallory",region:"Both",boards:mB("Office Manager"),kpis:mK("Office Manager"),nested:false,sendFreq:"daily",hours:"7AM-3PM"},
+  {id:1,name:"Jordan Lee",title:"Owner",role:"Owner",email:"Jordan@Unicitysolar.com",manager:"",region:"Both",boards:mB("Owner"),kpis:mK("Owner"),nested:true,sendFreq:"daily",hours:"24/7"},
+  {id:2,name:"Mallory Amend",title:"COO",role:"COO",email:"Mamend@unicitysolar.com",manager:"Dan",region:"Both",boards:mB("COO"),kpis:mK("COO"),nested:true,sendFreq:"daily",hours:"24/7"},
+  {id:30,name:"Josh Labarre",title:"VP of Operations",role:"VP of Operations",email:"Josh@Unicitysolar.com",manager:"Mallory",region:"Both",boards:mB("VP of Operations"),kpis:mK("VP of Operations"),nested:true,sendFreq:"daily",hours:"24/7"},
+  {id:3,name:"Julie Schultz",title:"Office Manager",role:"Office Manager",email:"JSchultz@unicitysolar.com",manager:"Mallory",region:"Both",boards:mB("Office Manager"),kpis:mK("Office Manager"),nested:false,sendFreq:"daily",hours:"7AM-3PM"},
   {id:4,name:"Val Martin",title:"Office Administrator",role:"Office Administrator",email:"",manager:"Mallory",region:"Both",boards:mB("Office Administrator"),kpis:mK("Office Administrator"),nested:false,sendFreq:"daily",hours:"7AM-3PM"},
-  {id:5,name:"Julio Valdes",title:"Installation Manager",role:"Installation Manager",email:"",manager:"Mallory",region:"FL",boards:mB("Installation Manager"),kpis:mK("Installation Manager"),nested:false,sendFreq:"daily",hours:"5:30AM-3PM"},
-  {id:6,name:"Aidon Paris",title:"Warehouse Manager",role:"Warehouse Manager",email:"",manager:"Mallory",region:"FL",boards:mB("Warehouse Manager"),kpis:mK("Warehouse Manager"),nested:true,sendFreq:"daily",hours:"5:30AM-3PM"},
+  {id:5,name:"Julio Valdes",title:"Installation Manager",role:"Installation Manager",email:"Jvadles@unicitysolar.com",manager:"Mallory",region:"FL",boards:mB("Installation Manager"),kpis:mK("Installation Manager"),nested:false,sendFreq:"daily",hours:"5:30AM-3PM"},
+  {id:6,name:"Aidon Paris",title:"Warehouse Manager",role:"Warehouse Manager",email:"aparis@unicitysolar.com",manager:"Mallory",region:"FL",boards:mB("Warehouse Manager"),kpis:mK("Warehouse Manager"),nested:true,sendFreq:"daily",hours:"5:30AM-3PM"},
   {id:7,name:"Ro Mora",title:"Service Manager",role:"Service Manager",email:"",manager:"Mallory",region:"FL",boards:mB("Service Manager"),kpis:mK("Service Manager"),nested:false,sendFreq:"daily",hours:"5:30AM-3PM"},
   {id:8,name:"Autumn Wilson",title:"Service Coordinator",role:"Service Coordinator",email:"",manager:"Ro Mora",region:"FL",boards:mB("Service Coordinator"),kpis:mK("Service Coordinator"),nested:false,sendFreq:"daily",hours:"8AM-4PM"},
-  {id:9,name:"Anthony Cowan",title:"Engineering Coordinator",role:"Engineering Coordinator",email:"",manager:"Julie",region:"FL",boards:mB("Engineering Coordinator"),kpis:mK("Engineering Coordinator"),nested:false,sendFreq:"daily",hours:"8AM-4PM"},
+  {id:9,name:"Anthony Cowan",title:"Engineering Coordinator",role:"Engineering Coordinator",email:"acowan@unicitysolar.com",manager:"Julie",region:"FL",boards:mB("Engineering Coordinator"),kpis:mK("Engineering Coordinator"),nested:false,sendFreq:"daily",hours:"8AM-4PM"},
   {id:10,name:"Heather Pennoyer",title:"Permitting Coordinator",role:"Permitting Coordinator",email:"",manager:"Julie",region:"FL",boards:mB("Permitting Coordinator"),kpis:mK("Permitting Coordinator"),nested:false,sendFreq:"daily",hours:"8AM-4PM"},
   {id:11,name:"Anjulik Texteira",title:"Permitting Coordinator",role:"Permitting Coordinator",email:"",manager:"Julie",region:"FL",boards:mB("Permitting Coordinator"),kpis:mK("Permitting Coordinator"),nested:false,sendFreq:"daily",hours:"7AM-3PM"},
   {id:12,name:"Matt Bloemer",title:"Scheduling Coordinator",role:"Scheduling Coordinator",email:"",manager:"Julie",region:"FL",boards:mB("Scheduling Coordinator"),kpis:mK("Scheduling Coordinator"),nested:false,sendFreq:"daily",hours:"8AM-4PM"},
@@ -193,7 +193,7 @@ const TEAM_INIT=[
   {id:15,name:"Kristina Solis",title:"Net Metering Coordinator",role:"Net Metering Coordinator",email:"",manager:"Julie",region:"FL",boards:mB("Net Metering Coordinator"),kpis:mK("Net Metering Coordinator"),nested:false,sendFreq:"daily",hours:"7AM-3PM"},
   {id:16,name:"Felicia",title:"Net Metering Coordinator",role:"Net Metering Coordinator",email:"",manager:"Julie",region:"FL",boards:mB("Net Metering Coordinator"),kpis:mK("Net Metering Coordinator"),nested:false,sendFreq:"daily",hours:"7AM-3PM"},
   {id:17,name:"Brissa",title:"Receptionist",role:"Receptionist",email:"",manager:"Julie",region:"FL",boards:mB("Receptionist"),kpis:mK("Receptionist"),nested:false,sendFreq:"daily",hours:"8AM-4PM"},
-  {id:18,name:"Dan Sperruzzi",title:"President of Sales",role:"President of Sales",email:"",manager:"",region:"Both",boards:mB("President of Sales"),kpis:mK("President of Sales"),nested:true,sendFreq:"daily",hours:"24/7"},
+  {id:18,name:"Dan Sperruzzi",title:"President of Sales",role:"President of Sales",email:"dsperruzzi@unicitysolar.com",manager:"",region:"Both",boards:mB("President of Sales"),kpis:mK("President of Sales"),nested:true,sendFreq:"daily",hours:"24/7"},
   {id:19,name:"Aaron Clements",title:"Sales Relations Manager",role:"Sales Relations Manager",email:"",manager:"Dan",region:"Both",boards:mB("Sales Relations Manager"),kpis:mK("Sales Relations Manager"),nested:false,sendFreq:"daily",hours:"Varies"},
   {id:20,name:"Freddie",title:"Account Manager",role:"Account Manager",email:"",manager:"Aaron",region:"Both",boards:mB("Account Manager"),kpis:mK("Account Manager"),nested:false,sendFreq:"daily",hours:"Varies"},
   {id:21,name:"Erika",title:"Account Manager",role:"Account Manager",email:"",manager:"Aaron",region:"Both",boards:mB("Account Manager"),kpis:mK("Account Manager"),nested:false,sendFreq:"daily",hours:"Varies"},
@@ -1083,6 +1083,31 @@ function KpiMapping({kpiTags,setKpiTags,team,th}){
 // MAIN APP
 // ─────────────────────────────────────────────
 export default function App(){
+// ── Session: who am I? ──
+  var [session,setSession]=useState({signedIn:false,email:"",name:"",loaded:false});
+  React.useEffect(function(){
+    fetch("/api/auth/me").then(function(r){return r.json();}).then(function(d){
+      setSession({signedIn:!!d.signedIn,email:d.email||"",name:d.name||"",loaded:true});
+    }).catch(function(){
+      setSession({signedIn:false,email:"",name:"",loaded:true});
+    });
+  },[]);
+
+  // ── Sign-in gate ──
+  if(!session.loaded){
+    return <div style={{minHeight:"100vh",background:"#1A1C20",display:"flex",alignItems:"center",justifyContent:"center",color:"#897C80",fontFamily:"system-ui,sans-serif"}}>Loading…</div>;
+  }
+  if(!session.signedIn){
+    var devBypass=typeof window!=="undefined"&&window.location.hostname==="localhost";
+    return <div style={{minHeight:"100vh",background:"#1A1C20",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"system-ui,sans-serif",padding:"2rem"}}>
+      <div style={{background:"#2E3138",border:"1px solid rgba(242,143,29,0.2)",borderRadius:16,padding:"2.5rem 2rem",maxWidth:420,textAlign:"center"}}>
+        <p style={{margin:"0 0 0.5rem",fontSize:22,fontWeight:500,color:"#F0F0F0"}}>Unicity Solar KPI</p>
+        <p style={{margin:"0 0 1.5rem",fontSize:13,color:"#897C80"}}>Sign in with your <span style={{color:"#F28F1D"}}>@unicitysolar.com</span> or <span style={{color:"#F28F1D"}}>@unicityhome.com</span> account.</p>
+        <a href="/api/auth/google/start" style={{display:"inline-block",background:"linear-gradient(135deg,#F28F1D,#D4721A)",color:"#fff",padding:"11px 28px",borderRadius:10,textDecoration:"none",fontWeight:500,fontSize:14}}>Sign in with Google</a>
+        {devBypass&&<p style={{margin:"1.5rem 0 0",fontSize:11,color:"#897C80"}}>Dev: localhost detected. Production: <a href="https://unicity-kpi.vercel.app" style={{color:"#1D6FB5"}}>unicity-kpi.vercel.app</a></p>}
+      </div>
+    </div>;
+  }
   var [dark,setDark]=useState(true);
   var th=dark?DARK:LIGHT;
   var glass={background:th.card,border:"1px solid "+th.border,borderRadius:16,padding:"1.25rem"};
@@ -1216,12 +1241,39 @@ export default function App(){
     setPrevLoad(false);
   }
 
-  function doSend(m,i){
-    var entry={id:Date.now(),name:m.name,role:m.role,email:m.email||"(not set)",ts:new Date().toLocaleString(),dataSource:liveApiData?"Live Pipedrive":"Simulated",mode:draft?"Draft":"Live",status:"Sent"};
-    setSendLog(function(l){return [entry].concat(l);});setSendStatus(function(s){var n=Object.assign({},s);n[i]=new Date().toLocaleTimeString();return n;});
-    addAudit("Email sent manually",m.name+" - "+entry.dataSource,"system");
-  }
+async function doSend(m,i){
+    if(!m.email){
+      alert("No email set for "+m.name+". Add it to TEAM_INIT first.");
+      return;
+    }
+    setSendStatus(function(s){var n=Object.assign({},s);n[i]="sending...";return n;});
 
+    try{
+      var html="<div style='font-family:Arial,sans-serif;background:#24262B;color:#F0F0F0;padding:1.5rem;border-radius:8px'>"
+        +"<h2 style='color:#F28F1D;margin:0 0 1rem'>Test briefing — "+m.name+"</h2>"
+        +"<p style='margin:0 0 0.5rem'>Hello "+m.name.split(" ")[0]+",</p>"
+        +"<p style='margin:0 0 0.5rem'>This is a manual send from the Unicity Solar KPI dashboard.</p>"
+        +"<p style='margin:0 0 0.5rem'>Pipeline summary: <strong>"+pd.totalActiveJobs+"</strong> active jobs, <strong>"+pd.totalStuck+"</strong> stuck, end-to-end avg <strong>"+pd.endToEndDays+"d</strong>.</p>"
+        +"<p style='margin:1.5rem 0 0;font-size:11px;color:#897C80'>Sent "+new Date().toLocaleString()+" — "+(liveApiData?"Live data":"Simulated data")+"</p>"
+        +"</div>";
+
+      var res=await fetch("/api/email/send",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({to:m.email,subject:"Unicity KPI Briefing — Test",html:html})
+      });
+      var data=await res.json();
+      if(!res.ok)throw new Error(data.error||"Send failed");
+
+      var entry={id:Date.now(),name:m.name,role:m.role,email:m.email,ts:new Date().toLocaleString(),dataSource:liveApiData?"Live Pipedrive":"Simulated",mode:draft?"Draft":"Live",status:"Sent"};
+      setSendLog(function(l){return [entry].concat(l);});
+      setSendStatus(function(s){var n=Object.assign({},s);n[i]=new Date().toLocaleTimeString();return n;});
+      addAudit("Email sent",m.name+" — "+entry.dataSource,"system");
+    }catch(err){
+      setSendStatus(function(s){var n=Object.assign({},s);n[i]="failed";return n;});
+      alert("Send failed: "+(err.message||"unknown"));
+    }
+  }
   var TABS=[{id:"Setup",icon:"ti-settings"},{id:"Team",icon:"ti-users"},{id:"Boards",icon:"ti-layout-board"},{id:"Intelligence",icon:"ti-brain"},{id:"Preview",icon:"ti-mail"},{id:"Send",icon:"ti-send"},{id:"Audit",icon:"ti-history"},{id:"RALPH",icon:"ti-circuit-board"}];
 
   function getDept(r){if(["Owner","COO","VP of Operations","Office Manager","Office Administrator","Installation Manager","Warehouse Manager","Service Manager","Service Coordinator","Engineering Coordinator","Permitting Coordinator","Scheduling Coordinator","Inspection Coordinator","Net Metering Coordinator","Receptionist"].indexOf(r)>=0)return"Operations";if(["President of Sales","Sales Relations Manager","Account Manager","After Hours Account Manager","Onboarding Coordinator"].indexOf(r)>=0)return"Sales";if(["Accounting Manager","Commissions Coordinator","Director of Finance","Funding Coordinator"].indexOf(r)>=0)return"Finance";return"AI";}
@@ -1242,7 +1294,8 @@ export default function App(){
         <p style={{margin:0,fontSize:11,color:th.textMuted}}>Morning KPI briefing system v8</p>
       </div>
       <div style={{marginLeft:"auto",display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-        {liveApiData&&<Pill text={"Live - "+pd.totalActiveJobs+" jobs"} color="green"/>}
+	<span style={{fontSize:11,color:"#897C80",marginRight:8}}>{session.name||session.email} · <a href="/api/auth/signout" style={{color:"#F28F1D",textDecoration:"none"}}>Sign out</a></span>        
+	{liveApiData&&<Pill text={"Live - "+pd.totalActiveJobs+" jobs"} color="green"/>}
         {liveLoad&&<Pill text="Pulling..." color="amber"/>}
         <span style={{background:C.green+"12",border:"1px solid "+C.green+"30",borderRadius:20,padding:"4px 10px",fontSize:11,fontWeight:500,color:C.green}}>Read-only</span>
         <button onClick={function(){setDark(function(d){return !d;});}} style={{display:"flex",alignItems:"center",gap:5,background:th.inputBg,border:"1px solid "+th.borderPlain,borderRadius:20,padding:"5px 12px",color:th.textMuted,fontSize:11,cursor:"pointer"}}>
