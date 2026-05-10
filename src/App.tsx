@@ -242,19 +242,15 @@ const RALPH_STAGES=[
 // PIPEDRIVE FETCH
 // ─────────────────────────────────────────────
 function valKey(k){if(!k||k.length<20)return "Key too short";if(!/^[a-f0-9]+$/i.test(k))return "Invalid characters";return null;}
-async function fetchPD(apiKey,setErr,setHealth){
-  var e=valKey(apiKey);if(e){setErr(e);setHealth(function(h){return Object.assign({},h,{pd:"invalid key"});});return null;}
+async function fetchPD(_apiKey,setErr,setHealth){
   setErr(null);
   try{
-    var instruc="Using Pipedrive API token "+apiKey+", make read-only GET requests to pipelines, stages, and open deals. Return ONLY JSON (no markdown). Schema: {success:true, totalDeals:number, pipelines:[{id,name}], boardData:{pipelineName:{totalDeals:number, stages:[{name,count,avgDays,deals:[{id,name,days,pipedriveUrl}]}]}}}. On auth failure: {success:false,error:string}";
-    var res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:4000,messages:[{role:"user",content:instruc}]})});
-    var data=await res.json();
-    var raw=(data.content||[]).find(function(b){return b.type==="text";});
-    var p=JSON.parse((raw?raw.text:"").replace(/```json|```/g,"").trim());
-    if(!p.success){var msg=p.error||"Unknown";setErr("Pipedrive: "+msg);setHealth(function(h){return Object.assign({},h,{pd:msg.toLowerCase().indexOf("unauthorized")>=0?"invalid key":"unreachable"});});return null;}
+    var res=await fetch("/api/pipedrive/pull",{method:"POST",headers:{"Content-Type":"application/json"}});
+    var p=await res.json();
+    if(!res.ok||!p.success){var msg=p.error||("HTTP "+res.status);setErr("Pipedrive: "+msg);setHealth(function(h){return Object.assign({},h,{pd:res.status===401?"invalid key":"unreachable"});});return null;}
     setHealth(function(h){return Object.assign({},h,{pd:"connected",lastPull:new Date().toLocaleTimeString()});});
     return{boardData:p.boardData,totalDeals:p.totalDeals,pipelines:p.pipelines};
-  }catch(err){setErr("Request failed: "+err.message);setHealth(function(h){return Object.assign({},h,{pd:"request failed"});});return null;}
+  }catch(err:any){setErr("Request failed: "+err.message);setHealth(function(h){return Object.assign({},h,{pd:"request failed"});});return null;}
 }
 
 // ─────────────────────────────────────────────
@@ -1139,7 +1135,6 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
   function pushToLive(){setDraft(false);setShowPush(false);setAudit(function(l){return l.map(function(e){return Object.assign({},e,{draft:false});});});addAudit("Pushed to live","All draft changes promoted","system");}
 
   async function pullLive(){
-    if(!pdKey){setApiErr("Please enter your Pipedrive API key first.");return;}
     setLiveLoad(true);setApiHealth(function(h){return Object.assign({},h,{pd:"checking"});});setApiErr(null);
     var d=await fetchPD(pdKey,setApiErr,setApiHealth);
     if(d){setLiveApiData(d);addAudit("Live Pipedrive data pulled",d.totalDeals+" open deals fetched","system");}
