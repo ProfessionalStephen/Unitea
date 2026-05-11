@@ -290,7 +290,7 @@ async function sendGmail(accessToken: string, fromEmail: string, toEmail: string
     const message = [
         `From: Unicity Solar KPI <${fromEmail}>`,
         `To: ${toEmail}`,
-        `Subject: ${subject}`,
+        `Subject: =?UTF-8?B?${Buffer.from(subject).toString("base64")}?=`,
         `MIME-Version: 1.0`,
         `Content-Type: text/html; charset=UTF-8`,
         ``,
