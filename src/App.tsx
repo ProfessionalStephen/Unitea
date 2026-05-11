@@ -258,63 +258,6 @@ async function fetchPD(_apiKey,setErr,setHealth){
 // Fixed structure — AI fills content only
 // ─────────────────────────────────────────────
 
-// Fetch AI-generated text content only (no HTML structure)
-async function fetchEmailContent(person, pd, kpiTags, liveApiData, isMonday, isOwnerLevel) {
-  var kpiValues = person.kpis.map(function(k) {
-    var tag = kpiTags.find(function(t) { return t.name === k; });
-    var mapped = tag && tag.sources.length > 0;
-    var val = "—";
-    if (liveApiData && mapped && tag.sources[0]) {
-      var src = tag.sources[0];
-      var bd = liveApiData.boardData ? liveApiData.boardData[src.board] : null;
-      if (bd) {
-        if (src.scope === "board") val = String(bd.totalDeals);
-        else if (src.scope === "stage" && src.stage) {
-          var st = bd.stages ? bd.stages.find(function(s) { return s.name && s.name.toLowerCase() === src.stage.toLowerCase(); }) : null;
-          if (st) val = String(st.count);
-        }
-      }
-    } else {
-      // Simulated values
-      var simVals = {"Total active jobs": String(pd.totalActiveJobs), "End-to-end pipeline days": pd.endToEndDays + "d", "Critical bottlenecks": String(pd.totalStuck)};
-      val = simVals[k] || String(Math.floor(Math.random() * 30) + 1);
-    }
-    return k + ": " + val;
-  }).join(", ");
-
-  var top3 = pd.bottlenecks.slice(0, 3).map(function(b) {
-    return b.board + " > " + b.stage + " (" + b.stuckCount + " stuck, avg " + b.avgDays + "d, " + b.pctAbove + "% above hist)";
-  }).join("; ");
-
-  var days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-  var day = days[new Date().getDay()];
-
-  var prompt = "You are writing content for a morning KPI briefing email for " + person.name + ", " + person.title + " at Unicity Solar Energy. Today is " + day + ".\n\n"
-    + "Return ONLY a valid JSON object with these exact keys, no markdown, no backticks:\n"
-    + "{\n"
-    + "  \"greeting\": \"A warm 1-2 sentence greeting using their first name " + person.name.split(" ")[0] + ". Mention " + day + (isMonday ? " and add a motivational note" : "") + ". Max 40 words.\",\n"
-    + "  \"needsAttention\": [\"2-3 specific bottleneck alert strings based on: " + top3 + ". Each string: board name, stage, days stuck, brief action suggestion. Max 20 words each.\"],\n"
-    + "  \"priorities\": [\"3 specific action item strings for a " + person.title + " today. Concrete and role-specific. Max 15 words each.\"]"
-    + (isOwnerLevel ? ",\n  \"teamPulse\": \"2-3 sentence company-wide snapshot. Total jobs: " + pd.totalActiveJobs + ", stuck: " + pd.totalStuck + ", end-to-end avg: " + pd.endToEndDays + "d. Max 50 words.\"" : "")
-    + (isMonday ? ",\n  \"weekReview\": \"2-3 sentence prior week summary comparing performance. Reference boards and numbers. Max 50 words.\"" : "")
-    + "\n}";
-
-  try {
-    var res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST", headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({model: "claude-sonnet-4-20250514", max_tokens: 600, messages: [{role: "user", content: prompt}]})
-    });
-    var data = await res.json();
-    var raw = (data.content || []).find(function(b) { return b.type === "text"; });
-    return JSON.parse((raw ? raw.text : "{}").replace(/```json|```/g, "").trim());
-  } catch(e) {
-    return {
-      greeting: "Good morning " + person.name.split(" ")[0] + ", here is your daily briefing for " + day + ".",
-      needsAttention: pd.bottlenecks.slice(0,2).map(function(b) { return b.board + " > " + b.stage + ": " + b.stuckCount + " stuck jobs averaging " + b.avgDays + " days."; }),
-      priorities: ["Review all rotten deals and reassign where needed.", "Check in with your team on today's scheduled installs.", "Follow up on any open customer escalations."]
-    };
-  }
-}
 
 // Build KPI table HTML from pipelineData — no AI, guaranteed layout
 function buildKpiTableHtml(person, pd, kpiTags, liveApiData) {
@@ -520,6 +463,37 @@ function assembleEmail(person, content, kpiTableHtml, needsAttentionHtml, boardH
   return "<div style='max-width:600px;margin:0 auto;background:#24262B;border-radius:12px;overflow:hidden;border:1px solid rgba(242,143,29,0.2);'>"
     + sections.join("")
     + "</div>";
+}
+
+// Escape HTML special chars to prevent injection in email body.
+function escHtml(s){
+  if(s===null||s===undefined)return "";
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+
+// Role-aware default priorities. Deterministic — no AI needed.
+function getPriorities(person,pd){
+  var stuck=pd.totalStuck||0;
+  var role=(person.role||"").toLowerCase();
+  var base=[];
+  if(role.indexOf("owner")>=0||role.indexOf("ceo")>=0||role.indexOf("coo")>=0||role.indexOf("vp")>=0){
+    base=[
+      "Review top 3 bottlenecks with relevant managers",
+      stuck>0?("Address "+stuck+" stuck deals across all boards"):"Maintain current pipeline velocity",
+      "Check team workload distribution"
+    ];
+  }else if(role.indexOf("sales")>=0){
+    base=["Follow up on stale leads (>14 days no activity)","Review weekly conversion metrics","Coordinate with Installation on hand-off readiness"];
+  }else if(role.indexOf("install")>=0||role.indexOf("warehouse")>=0||role.indexOf("operations")>=0){
+    base=["Confirm today's installation schedule","Check material availability for next 5 jobs","Review safety/permit status for active jobs"];
+  }else if(role.indexOf("finance")>=0){
+    base=["Review M1/M2/M3 invoice status","Reconcile prior week payments","Flag any aging receivables >30 days"];
+  }else if(role.indexOf("engineer")>=0||role.indexOf("design")>=0){
+    base=["Review pending design queue","Address engineering revisions","Coordinate utility submission status"];
+  }else{
+    base=["Review your KPIs above","Address items in 'Needs attention'","Coordinate with your manager on blockers"];
+  }
+  return base;
 }
 
 // Build standalone board health block injected into preview emails for nested-access roles.
@@ -1143,71 +1117,149 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
 
   async function genAiSummary(){
     setSummaryLoading(true);
-    var top5=pd.bottlenecks.slice(0,5).map(function(b){return b.board+" > "+b.stage+" ("+b.pctAbove+"% above avg, "+b.stuckCount+" stuck)";}).join("; ");
-    var patterns=pd.timePatterns.map(function(p){return p.pattern;}).join("; ");
-    var prompt="You are a solar installation operations analyst. Given these bottlenecks: "+top5+". And these patterns: "+patterns+". Write 3-4 sentences of plain English analysis identifying the root cause patterns and what they suggest about the operation. Be specific and actionable. Do not use bullet points.";
-    try{
-      var res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:300,messages:[{role:"user",content:prompt}]})});
-      var data=await res.json();
-      var raw=(data.content||[]).find(function(b){return b.type==="text";});
-      setAiSummary(raw?raw.text:"Unable to generate summary.");
-    }catch(err){setAiSummary("Analysis unavailable: "+err.message);}
+    var top3=(pd.bottlenecks||[]).slice(0,3);
+    var lines=[];
+    if(top3.length===0){
+      lines.push("No significant bottlenecks detected. Pipeline is flowing within expected thresholds.");
+    }else{
+      lines.push("Top "+top3.length+" bottleneck"+(top3.length>1?"s":"")+" across the pipeline:");
+      top3.forEach(function(b,i){
+        lines.push((i+1)+". "+b.board+" › "+b.stage+" — "+b.stuckCount+" stuck deals, "+b.pctAbove+"% above average.");
+      });
+      lines.push("");
+      lines.push("Recommended focus: review the highest-percentage bottleneck with the owning team and identify whether the constraint is process, capacity, or external dependency.");
+    }
+    if(pd.timePatterns&&pd.timePatterns.length>0){
+      lines.push("");
+      lines.push("Patterns observed: "+pd.timePatterns.map(function(p){return p.pattern;}).join("; ")+".");
+    }
+    setAiSummary(lines.join("\n"));
     setSummaryLoading(false);
   }
 
-  // Generate preview email — no redundant health build, uses pd directly
+  // Generate preview email — fully deterministic, no AI. Built from pipelineData and person.
   async function genPreview(person,idx){
     setPrevLoad(true);setPrevEmail(null);
-    var kl=person.kpis.map(function(k){
-      var tag=kpiTags.find(function(t){return t.name===k;});var mapped=tag&&tag.sources.length>0;
-      var lv="";
-      if(liveApiData&&mapped&&tag.sources[0]){var src=tag.sources[0];var bd=liveApiData.boardData?liveApiData.boardData[src.board]:null;if(bd){if(src.scope==="board"){lv=" = "+bd.totalDeals+" deals";}else if(src.scope==="stage"&&src.stage){var st=bd.stages?bd.stages.find(function(s){return s.name&&s.name.toLowerCase()===src.stage.toLowerCase();}):null;if(st)lv=" = "+st.count+" deals";}}}
-      return k+(mapped?" (source: "+tag.sources.map(function(s){return s.board+(s.stage?" > "+s.stage:"");}).join(", ")+lv+")":" - unmapped");
-    }).join("\n");
-    var days=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-    var day=days[new Date().getDay()];var isMon=day==="Monday";
-    var isOwner=canAccess(person.role,"analyticsDeep");
-    var parts=[
-      "Generate a morning KPI briefing email for "+person.name+", "+person.title+" at Unicity Solar Energy.",
-      "Today: "+day+". Region: "+person.region+". Hours: "+person.hours+".",
-      liveApiData?"Data: live Pipedrive":"Data: simulated",
-      "","KPI tags — include ALL, no skipping:","",kl,"",
-      "HTML email, inline styles, max-width 600px, dark bg #24262B, text #F0F0F0, orange #F28F1D.",
-      "Sections separated by <hr style=\"border:none;border-top:1px solid rgba(255,255,255,0.08);margin:0;\">",
-      "DO NOT include a board health section — it will be injected programmatically after section 3.",
-      "",
-      "SECTION 1 - Greeting: warm, first name "+person.name.split(" ")[0]+", mention "+day+(isMon?", motivational":"")+".",
-      "SECTION 2 - Your KPIs today: ALL tags in 3-column HTML table. Each cell: tag name (11px #897C80) above bold value (18px #F0F0F0). Odd tags fill with empty tds. Use "+(liveApiData?"live":"realistic")+" numbers.",
-      "SECTION 3 - Needs attention: 2-3 bottleneck alerts, stage name, days stuck, View in Pipedrive link.",
-      "SECTION 4 - Today's priorities: 3 action items for "+person.title+".",
-      isMon?"SECTION 5 - Week in review: prior week summary with metrics and trends.":"",
-      isOwner?"SECTION - Team pulse: company-wide snapshot with 4-5 metrics.":"",
-      "FOOTER: snooze link | flag issue (mailto:ai@unicitysolar.com) | Read-only system - Unicity Solar Energy",
-      "","Return ONLY the HTML. No markdown, no backticks."
-    ];
-    var prompt=parts.filter(function(p){return p!==undefined&&p!==null;}).join("\n");
     try{
-      var res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:2500,messages:[{role:"user",content:prompt}]})});
-      var data=await res.json();
-      var raw=(data.content||[]).find(function(b){return b.type==="text";});
-      var emailBody=(raw?raw.text:"<p style='color:#EF4444'>No content.</p>").replace(/<\/body>/gi,"").replace(/<\/html>/gi,"").trim();
+      var days=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+      var day=days[new Date().getDay()];
+      var isMon=day==="Monday";
+      var isOwner=canAccess(person.role,"analyticsDeep");
+      var firstName=person.name.split(" ")[0];
 
-      var finalHtml=emailBody;
-      if(person.nested){
-        var hBlock=buildEmailHealthSection(pd,person.boards);
-        var injected=false;
-        var markers=["Today's priorities","SECTION 4","priorities"];
-        for(var mi=0;mi<markers.length;mi++){
-          var idx2=emailBody.indexOf(markers[mi]);
-          if(idx2>=0){var before=emailBody.slice(0,idx2);var hrIdx=before.lastIndexOf("<hr");var insertAt=hrIdx>=0?hrIdx:idx2;
-            finalHtml=emailBody.slice(0,insertAt)+"<hr style=\"border:none;border-top:1px solid rgba(255,255,255,0.08);margin:0;\">"+hBlock+"<hr style=\"border:none;border-top:1px solid rgba(255,255,255,0.08);margin:0;\">"+emailBody.slice(insertAt);
-            injected=true;break;
-          }
+      // ── KPI value resolver: live data when mapped, fallback otherwise ──
+      function resolveKpi(kpiName){
+        var tag=kpiTags.find(function(t){return t.name===kpiName;});
+        if(!tag||!tag.sources||tag.sources.length===0)return tag&&tag.fallback?tag.fallback:"—";
+        if(!liveApiData||!liveApiData.boardData)return tag.fallback||"—";
+        var src=tag.sources[0];
+        var bd=liveApiData.boardData[src.board];
+        if(!bd)return tag.fallback||"—";
+        if(src.scope==="board")return String(bd.totalDeals);
+        if(src.scope==="stage"&&src.stage){
+          var st=bd.stages&&bd.stages.find(function(s){return s.name&&s.name.toLowerCase()===src.stage.toLowerCase();});
+          return st?String(st.count):(tag.fallback||"—");
         }
-        if(!injected){var footIdx=emailBody.search(/snooze|flag an issue|read-only/i);var ins=footIdx>=0?footIdx:emailBody.length;finalHtml=emailBody.slice(0,ins)+hBlock+emailBody.slice(ins);}
+        return tag.fallback||"—";
       }
+
+      // ── Build KPI table (3 cols, fills with empty cells for odd counts) ──
+      var kpiCells=person.kpis.map(function(k){
+        var v=resolveKpi(k);
+        return "<td style='padding:10px 8px;vertical-align:top;width:33%;'><div style='font-size:11px;color:#897C80;margin-bottom:3px;'>"+escHtml(k)+"</div><div style='font-size:18px;color:#F0F0F0;font-weight:600;'>"+escHtml(v)+"</div></td>";
+      });
+      while(kpiCells.length%3!==0)kpiCells.push("<td></td>");
+      var kpiRows="";
+      for(var ri=0;ri<kpiCells.length;ri+=3){
+        kpiRows+="<tr>"+kpiCells[ri]+kpiCells[ri+1]+kpiCells[ri+2]+"</tr>";
+      }
+
+      // ── Bottlenecks (top 3 relevant to this person's boards) ──
+      var personBoards=person.boards==="all"?Object.keys(BOARDS):(Array.isArray(person.boards)?person.boards:[]);
+      var bottlenecks=(pd.bottlenecks||[]).filter(function(b){return personBoards.indexOf(b.board)>=0;}).slice(0,3);
+      var bottleneckHtml=bottlenecks.length===0
+        ? "<p style='margin:0;font-size:13px;color:#22C55E;'>No bottlenecks detected in your boards. ✓</p>"
+        : bottlenecks.map(function(b){
+            return "<div style='margin-bottom:8px;padding:8px 10px;background:rgba(239,68,68,0.08);border-left:3px solid #EF4444;border-radius:0 4px 4px 0;'>"
+              +"<div style='font-size:13px;color:#F0F0F0;font-weight:500;'>"+escHtml(b.board)+" › "+escHtml(b.stage)+"</div>"
+              +"<div style='font-size:11px;color:#897C80;margin-top:2px;'>"+b.stuckCount+" stuck deals · "+b.pctAbove+"% above avg</div>"
+              +"</div>";
+          }).join("");
+
+      // ── Today's priorities (role-aware, deterministic) ──
+      var priorityList=getPriorities(person,pd);
+      var priorityHtml=priorityList.map(function(p,i){
+        return "<div style='margin-bottom:6px;font-size:13px;color:#F0F0F0;'><span style='color:#F28F1D;font-weight:600;margin-right:6px;'>"+(i+1)+".</span>"+escHtml(p)+"</div>";
+      }).join("");
+
+      // ── Health section (existing builder, only for nested-access roles) ──
+      var healthHtml=person.nested?buildEmailHealthSection(pd,personBoards):"";
+
+      // ── Week in review (Mondays only) ──
+      var weekHtml=isMon?(
+        "<hr style='border:none;border-top:1px solid rgba(255,255,255,0.08);margin:0;'>"
+        +"<div style='padding:18px;'>"
+        +"<h2 style='margin:0 0 10px;font-size:15px;color:#F28F1D;font-weight:600;'>Week in review</h2>"
+        +"<p style='margin:0 0 6px;font-size:13px;color:#F0F0F0;'>Prior week: "+(pd.totalActiveJobs||0)+" active jobs, "+(pd.totalStuck||0)+" total bottlenecks, end-to-end avg "+(pd.endToEndDays||0)+" days.</p>"
+        +"<p style='margin:0;font-size:12px;color:#897C80;'>Industry benchmark: "+INDUSTRY_BENCHMARK_DAYS+" days.</p>"
+        +"</div>"
+      ):"";
+
+      // ── Owner-level team pulse ──
+      var ownerHtml=isOwner?(
+        "<hr style='border:none;border-top:1px solid rgba(255,255,255,0.08);margin:0;'>"
+        +"<div style='padding:18px;'>"
+        +"<h2 style='margin:0 0 10px;font-size:15px;color:#F28F1D;font-weight:600;'>Team pulse</h2>"
+        +"<table style='width:100%;border-collapse:collapse;'><tr>"
+        +"<td style='padding:8px;width:25%;'><div style='font-size:11px;color:#897C80;'>Active</div><div style='font-size:16px;color:#F0F0F0;font-weight:600;'>"+(pd.totalActiveJobs||0)+"</div></td>"
+        +"<td style='padding:8px;width:25%;'><div style='font-size:11px;color:#897C80;'>Stuck</div><div style='font-size:16px;color:#F0F0F0;font-weight:600;'>"+(pd.totalStuck||0)+"</div></td>"
+        +"<td style='padding:8px;width:25%;'><div style='font-size:11px;color:#897C80;'>E2E days</div><div style='font-size:16px;color:#F0F0F0;font-weight:600;'>"+(pd.endToEndDays||0)+"</div></td>"
+        +"<td style='padding:8px;width:25%;'><div style='font-size:11px;color:#897C80;'>Source</div><div style='font-size:12px;color:#F0F0F0;font-weight:500;'>"+(liveApiData?"Live":"Sim")+"</div></td>"
+        +"</tr></table></div>"
+      ):"";
+
+      // ── Assemble full email ──
+      var finalHtml=""
+        +"<div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#24262B;color:#F0F0F0;border-radius:8px;overflow:hidden;'>"
+        // Section 1: greeting
+        +"<div style='padding:18px;'>"
+        +"<h1 style='margin:0 0 4px;font-size:20px;color:#F28F1D;font-weight:600;'>Good morning, "+escHtml(firstName)+"</h1>"
+        +"<p style='margin:0;font-size:13px;color:#897C80;'>"+escHtml(day)+" "+new Date().toLocaleDateString()+" · "+escHtml(person.title)+(isMon?" · New week, fresh start.":"")+"</p>"
+        +"</div>"
+        // Section 2: KPIs
+        +"<hr style='border:none;border-top:1px solid rgba(255,255,255,0.08);margin:0;'>"
+        +"<div style='padding:18px;'>"
+        +"<h2 style='margin:0 0 10px;font-size:15px;color:#F28F1D;font-weight:600;'>Your KPIs today</h2>"
+        +"<table style='width:100%;border-collapse:collapse;'>"+kpiRows+"</table>"
+        +"</div>"
+        // Section 3: needs attention
+        +"<hr style='border:none;border-top:1px solid rgba(255,255,255,0.08);margin:0;'>"
+        +"<div style='padding:18px;'>"
+        +"<h2 style='margin:0 0 10px;font-size:15px;color:#F28F1D;font-weight:600;'>Needs attention</h2>"
+        +bottleneckHtml
+        +"</div>"
+        // Health (injected for nested access)
+        +(healthHtml?"<hr style='border:none;border-top:1px solid rgba(255,255,255,0.08);margin:0;'>"+healthHtml:"")
+        // Section 4: priorities
+        +"<hr style='border:none;border-top:1px solid rgba(255,255,255,0.08);margin:0;'>"
+        +"<div style='padding:18px;'>"
+        +"<h2 style='margin:0 0 10px;font-size:15px;color:#F28F1D;font-weight:600;'>Today's priorities</h2>"
+        +priorityHtml
+        +"</div>"
+        // Optional sections
+        +weekHtml
+        +ownerHtml
+        // Footer
+        +"<hr style='border:none;border-top:1px solid rgba(255,255,255,0.08);margin:0;'>"
+        +"<div style='padding:14px 18px;font-size:11px;color:#897C80;text-align:center;'>"
+        +"Read-only system · Unicity Solar Energy · "+(liveApiData?"Live data":"Simulated data")+" · "+new Date().toLocaleTimeString()
+        +"</div>"
+        +"</div>";
+
       setPrevEmail(finalHtml);
-    }catch(err){setPrevEmail("<p style='color:#EF4444'>Error: "+err.message+"</p>");}
+    }catch(err:any){
+      setPrevEmail("<p style='color:#EF4444'>Error generating preview: "+(err.message||"unknown")+"</p>");
+    }
     setPrevLoad(false);
   }
 
