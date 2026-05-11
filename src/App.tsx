@@ -712,7 +712,7 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
         <span style={{fontSize:12,color:C.green}}>Live Pipedrive data &middot; {pd.totalActiveJobs} active jobs &middot; {pd.totalStuck} stuck</span>
       </div>}
       {!pd.isLive&&<div style={{background:C.amber+"0d",border:"1px solid "+C.amber+"22",borderRadius:10,padding:"7px 12px",marginBottom:"1rem"}}>
-        <span style={{fontSize:12,color:C.amber}}>Simulated data &mdash; paste Pipedrive API key in Setup for live intelligence</span>
+        <span style={{fontSize:12,color:C.amber}}>Simulated data &mdash; visit Setup tab and click "Pull live data" for current Pipedrive numbers</span>
       </div>}
 
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:8,marginBottom:"1rem"}}>
@@ -1322,7 +1322,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
         <button onClick={function(){setDark(function(d){return !d;});}} style={{display:"flex",alignItems:"center",gap:5,background:th.inputBg,border:"1px solid "+th.borderPlain,borderRadius:20,padding:"5px 12px",color:th.textMuted,fontSize:11,cursor:"pointer"}}>
           <i className={"ti ti-"+(dark?"sun":"moon")} style={{fontSize:13}} aria-hidden="true"/>{dark?"Light":"Dark"}
         </button>
-        <div style={{display:"flex",alignItems:"center",gap:5,background:th.inputBg,border:"1px solid "+th.borderPlain,borderRadius:20,padding:"5px 12px"}}><SDot on={gConn}/><span style={{fontSize:11,color:th.textMuted}}>{gConn?"Live":"Setup needed"}</span></div>
+        <div style={{display:"flex",alignItems:"center",gap:5,background:C.green+"12",border:"1px solid "+C.green+"33",borderRadius:20,padding:"5px 12px"}}><span style={{color:C.green,fontSize:10}}>●</span><span style={{fontSize:11,color:C.green}}>System ready</span></div>
       </div>
     </div>
 
@@ -1353,28 +1353,34 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
       <SubTab tabs={["General","KPI Mapping","Pipedrive Fields"]} active={stab} onChange={setStab} th={th}/>
       {stab==="General"&&<div style={{display:"flex",flexDirection:"column",gap:"1rem"}}>
         <div style={glass}>
-          <SLabel icon="ti-key" text="Pipedrive API key"/>
-          <div style={{display:"flex",gap:8}}>
-            <input value={pdKey} onChange={function(e){setPdKey(e.target.value);setApiErr(null);setApiHealth(function(h){return Object.assign({},h,{pd:"unknown"});});}} placeholder="Paste your Pipedrive API key..." style={Object.assign({},iS,{flex:1})} type="password"/>
-            <button onClick={pullLive} disabled={liveLoad} style={{background:C.orange+"22",border:"1px solid "+C.orange+"44",borderRadius:10,color:C.orange,fontWeight:500,fontSize:12,padding:"8px 14px",cursor:"pointer",flexShrink:0}}>{liveLoad?"Pulling...":"Pull live data"}</button>
+          <SLabel icon="ti-plug-connected" text="Connection status"/>
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:4}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 12px",background:C.green+"0d",border:"1px solid "+C.green+"22",borderRadius:8}}>
+              <div>
+                <p style={{margin:0,fontSize:13,color:th.text,fontWeight:500}}><span style={{color:C.green,marginRight:6}}>●</span>Pipedrive</p>
+                <p style={{margin:"2px 0 0",fontSize:11,color:th.textMuted}}>Read-only · server-managed credentials · no setup needed</p>
+              </div>
+              <button onClick={pullLive} disabled={liveLoad} style={{background:C.orange+"22",border:"1px solid "+C.orange+"44",borderRadius:8,color:C.orange,fontWeight:500,fontSize:12,padding:"6px 12px",cursor:"pointer"}}>{liveLoad?"Pulling...":(liveApiData?"Refresh":"Pull live data")}</button>
+            </div>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 12px",background:C.green+"0d",border:"1px solid "+C.green+"22",borderRadius:8}}>
+              <div>
+                <p style={{margin:0,fontSize:13,color:th.text,fontWeight:500}}><span style={{color:C.green,marginRight:6}}>●</span>Google Workspace</p>
+                <p style={{margin:"2px 0 0",fontSize:11,color:th.textMuted}}>Sender authorized · briefings sent automatically</p>
+              </div>
+            </div>
+            {liveApiData&&<div style={{padding:"8px 12px",background:C.blue+"08",border:"1px solid "+C.blue+"22",borderRadius:8}}>
+              <p style={{margin:0,fontSize:12,color:C.blue}}>Latest pull: {liveApiData.totalDeals} open deals across {(liveApiData.pipelines||[]).length} pipelines · {apiHealth.lastPull}</p>
+            </div>}
+            {apiErr&&<div style={{padding:"8px 12px",background:C.red+"0d",border:"1px solid "+C.red+"33",borderRadius:8}}>
+              <p style={{margin:0,fontSize:12,color:C.red}}>! {apiErr}</p>
+            </div>}
           </div>
-          <p style={{fontSize:11,color:th.textMuted,margin:"6px 0 4px"}}>Read-only GET access. Settings - Personal preferences - API in Pipedrive.</p>
-          {apiErr&&<div style={{background:C.red+"0d",border:"1px solid "+C.red+"33",borderRadius:8,padding:"7px 12px",marginTop:6}}><p style={{margin:0,fontSize:12,color:C.red}}>! {apiErr}</p><p style={{margin:"4px 0 0",fontSize:11,color:th.textMuted}}>Browsers cannot call Pipedrive directly (CORS). This app routes through Claude's API securely.</p></div>}
-          {liveApiData&&<div style={{background:C.green+"0d",border:"1px solid "+C.green+"22",borderRadius:8,padding:"7px 12px",marginTop:6}}><p style={{margin:0,fontSize:12,color:C.green}}>Connected - {liveApiData.totalDeals} open deals - {(liveApiData.pipelines||[]).length} pipelines - {apiHealth.lastPull}</p></div>}
-        </div>
-        <div style={glass}>
-          <SLabel icon="ti-brand-google" text="Gmail / Google Workspace OAuth"/>
-          <input value={gcId} onChange={function(e){setGcId(e.target.value);}} placeholder="your-client-id.apps.googleusercontent.com" style={Object.assign({},iS,{width:"100%",marginBottom:8})} type="text"/>
-          <p style={{margin:"0 0 8px",fontSize:11,color:th.textMuted}}>Scopes: gmail.send + gmail.readonly only.</p>
-          <button onClick={async function(){if(!gcId)return;var params=new URLSearchParams({client_id:gcId,redirect_uri:window.location.origin,response_type:"code",scope:"https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly",access_type:"offline",prompt:"consent"});window.open("https://accounts.google.com/o/oauth2/v2/auth?"+params,"_blank","width=500,height=600");setGConn(true);addAudit("Google OAuth initiated","gmail.send + gmail.readonly","system");}} style={{display:"flex",alignItems:"center",gap:8,background:gConn?C.green+"12":C.orange+"18",border:"1px solid "+(gConn?C.green:C.orange)+"44",borderRadius:10,padding:"9px 16px",color:gConn?C.green:C.orange,fontSize:13,fontWeight:500,cursor:"pointer"}}>
-            <SDot on={gConn}/>{gConn?"Google Workspace connected":"Connect Google Workspace"}
-          </button>
         </div>
         <div style={glass}>
           <SLabel icon="ti-clock" text="Send schedule"/>
           <div style={{display:"flex",alignItems:"center",gap:14}}>
             <input type="time" value={sendTime} onChange={function(e){setSendTime(e.target.value);}} style={Object.assign({},iS,{width:130,color:C.orange,fontWeight:500,fontSize:18})}/>
-            <div><p style={{margin:0,fontSize:13,color:th.text,fontWeight:500}}>Weekdays - Mon-Fri</p><p style={{margin:0,fontSize:11,color:th.textMuted}}>Monday sends weekly summary - {team.length} recipients</p></div>
+            <div><p style={{margin:0,fontSize:13,color:th.text,fontWeight:500}}>Weekdays · Mon-Fri</p><p style={{margin:"2px 0 0",fontSize:11,color:th.textMuted}}>Server schedule: 7am ET · {team.length} recipients · managed via Vercel cron</p></div>
           </div>
         </div>
         <div style={glass}>
