@@ -38,6 +38,11 @@ const RANGES=["Week over week","Month over month","Quarter over quarter","Year o
 // DATA MODEL — single source of truth
 // All UI components derive from pipelineData
 // ─────────────────────────────────────────────
+// Admin emails — these users see Setup, Send, Audit, RALPH tabs.
+// Non-admins only see Team, Boards, Intelligence, Preview.
+// To add an admin: append their email here (lowercase) and redeploy.
+const ADMIN_EMAILS = ["stephen@unicityhome.com", "aparis@unicitysolar.com"];
+
 function buildPipelineData(liveApiData) {
   var boardNames=Object.keys(BOARDS);
   var boards={};
@@ -711,8 +716,12 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
       {pd.isLive&&<div style={{background:C.green+"0d",border:"1px solid "+C.green+"22",borderRadius:10,padding:"7px 12px",marginBottom:"1rem"}}>
         <span style={{fontSize:12,color:C.green}}>Live Pipedrive data &middot; {pd.totalActiveJobs} active jobs &middot; {pd.totalStuck} stuck</span>
       </div>}
-      {!pd.isLive&&<div style={{background:C.amber+"0d",border:"1px solid "+C.amber+"22",borderRadius:10,padding:"7px 12px",marginBottom:"1rem"}}>
-        <span style={{fontSize:12,color:C.amber}}>Simulated data &mdash; visit Setup tab and click "Pull live data" for current Pipedrive numbers</span>
+      {staleCache&&<div style={{background:C.blue+"0d",border:"1px solid "+C.blue+"22",borderRadius:10,padding:"7px 12px",marginBottom:"1rem",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+        <span style={{fontSize:12,color:C.blue}}>Using cached data from {new Date(staleCache.ts).toLocaleTimeString()} &mdash; will re-attempt to pull live data shortly</span>
+        <button onClick={function(){pullLive(false);}} disabled={liveLoad} style={{background:C.blue+"22",border:"1px solid "+C.blue+"44",borderRadius:6,color:C.blue,fontWeight:500,fontSize:11,padding:"4px 10px",cursor:"pointer",flexShrink:0}}>{liveLoad?"Retrying...":"Retry now"}</button>
+      </div>}
+      {!pd.isLive&&!staleCache&&<div style={{background:C.amber+"0d",border:"1px solid "+C.amber+"22",borderRadius:10,padding:"7px 12px",marginBottom:"1rem"}}>
+        <span style={{fontSize:12,color:C.amber}}>{liveLoad?"Loading live data...":"Simulated data \u2014 Pipedrive unavailable"}</span>
       </div>}
 
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:8,marginBottom:"1rem"}}>
@@ -1063,8 +1072,11 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
   var glass={background:th.card,border:"1px solid "+th.border,borderRadius:16,padding:"1.25rem"};
   var iS={background:th.inputBg,border:"1px solid "+th.inputBorder,borderRadius:10,color:th.selectText,fontSize:13,padding:"8px 11px",outline:"none",fontFamily:"inherit",boxSizing:"border-box" as const};
 
+  // Derive admin status from session email (case-insensitive match)
+  var isAdmin=ADMIN_EMAILS.indexOf((session.email||"").toLowerCase())>=0;
+
   // Core state
-  var [tab,setTab]=useState("Setup");
+  var [tab,setTab]=useState(isAdmin?"Setup":"Boards");
   var [stab,setStab]=useState("General");
   var [pdKey,setPdKey]=useState("");
   var [gcId,setGcId]=useState("");
@@ -1089,6 +1101,9 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
 
   // Data layer state
   var [liveApiData,setLiveApiData]=useState(null);
+  // staleCache: if non-null, we're displaying data from localStorage because the live fetch failed.
+  // Shape: { ts: number } — when the cached data was originally fetched.
+  var [staleCache,setStaleCache]=useState<{ts:number}|null>(null);
   var [liveLoad,setLiveLoad]=useState(false);
   var [apiHealth,setApiHealth]=useState({pd:"unknown",gmail:"unknown",lastPull:"Never"});
   var [apiErr,setApiErr]=useState(null);
@@ -1113,12 +1128,71 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
   function switchToDraft(){setDraft(true);addAudit("Switched to draft mode","Changes will not affect live send","system");}
   function pushToLive(){setDraft(false);setShowPush(false);setAudit(function(l){return l.map(function(e){return Object.assign({},e,{draft:false});});});addAudit("Pushed to live","All draft changes promoted","system");}
 
-  async function pullLive(){
-    setLiveLoad(true);setApiHealth(function(h){return Object.assign({},h,{pd:"checking"});});setApiErr(null);
+  async function pullLive(isAuto){
+    setLiveLoad(true);
+    setApiHealth(function(h){return Object.assign({},h,{pd:"checking"});});
+    setApiErr(null);
     var d=await fetchPD(pdKey,setApiErr,setApiHealth);
-    if(d){setLiveApiData(d);addAudit("Live Pipedrive data pulled",d.totalDeals+" open deals fetched","system");}
+    if(d){
+      setLiveApiData(d);
+      setStaleCache(null);
+      try{window.localStorage.setItem("pipedrive:lastPull",JSON.stringify({data:d,ts:Date.now()}));}catch(e){}
+      addAudit(isAuto?"Live Pipedrive data auto-pulled":"Live Pipedrive data pulled",d.totalDeals+" open deals fetched","system");
+    } else if(isAuto){
+      // Auto-pull failed — try to use localStorage cache
+      try{
+        var raw=window.localStorage.getItem("pipedrive:lastPull");
+        if(raw){
+          var cached=JSON.parse(raw);
+          if(cached&&cached.data){
+            setLiveApiData(cached.data);
+            setStaleCache({ts:cached.ts});
+            setApiErr(null);
+          }
+        }
+      }catch(e){}
+    }
     setLiveLoad(false);
   }
+
+  // Auto-pull live data on dashboard mount.
+  // If the fetch fails, fall back to localStorage cache and retry once after 30s.
+  React.useEffect(function(){
+    var retryTimer=null;
+    var canceled=false;
+    async function attempt(){
+      if(canceled)return;
+      setLiveLoad(true);
+      setApiHealth(function(h){return Object.assign({},h,{pd:"checking"});});
+      var d=await fetchPD(pdKey,setApiErr,setApiHealth);
+      if(canceled)return;
+      if(d){
+        setLiveApiData(d);
+        setStaleCache(null);
+        try{window.localStorage.setItem("pipedrive:lastPull",JSON.stringify({data:d,ts:Date.now()}));}catch(e){}
+        addAudit("Live Pipedrive data auto-pulled",d.totalDeals+" open deals fetched","system");
+      } else {
+        // Try cache
+        try{
+          var raw=window.localStorage.getItem("pipedrive:lastPull");
+          if(raw){
+            var cached=JSON.parse(raw);
+            if(cached&&cached.data){
+              setLiveApiData(cached.data);
+              setStaleCache({ts:cached.ts});
+              setApiErr(null);
+            }
+          }
+        }catch(e){}
+        // Schedule one retry in 30 seconds
+        retryTimer=setTimeout(function(){if(!canceled)attempt();},30000);
+      }
+      setLiveLoad(false);
+    }
+    attempt();
+    return function(){canceled=true;if(retryTimer)clearTimeout(retryTimer);};
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
 
   async function genAiSummary(){
     setSummaryLoading(true);
@@ -1295,7 +1369,8 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
     }
   }
 
-  var TABS=[{id:"Setup",icon:"ti-settings"},{id:"Team",icon:"ti-users"},{id:"Boards",icon:"ti-layout-board"},{id:"Intelligence",icon:"ti-brain"},{id:"Preview",icon:"ti-mail"},{id:"Send",icon:"ti-send"},{id:"Audit",icon:"ti-history"},{id:"RALPH",icon:"ti-circuit-board"}];
+  var ALL_TABS=[{id:"Setup",icon:"ti-settings",admin:true},{id:"Team",icon:"ti-users",admin:false},{id:"Boards",icon:"ti-layout-board",admin:false},{id:"Intelligence",icon:"ti-brain",admin:false},{id:"Preview",icon:"ti-mail",admin:false},{id:"Send",icon:"ti-send",admin:true},{id:"Audit",icon:"ti-history",admin:true},{id:"RALPH",icon:"ti-circuit-board",admin:true}];
+  var TABS=ALL_TABS.filter(function(t){return isAdmin||!t.admin;});
 
   function getDept(r){if(["Owner","COO","VP of Operations","Office Manager","Office Administrator","Installation Manager","Warehouse Manager","Service Manager","Service Coordinator","Engineering Coordinator","Permitting Coordinator","Scheduling Coordinator","Inspection Coordinator","Net Metering Coordinator","Receptionist"].indexOf(r)>=0)return"Operations";if(["President of Sales","Sales Relations Manager","Account Manager","After Hours Account Manager","Onboarding Coordinator"].indexOf(r)>=0)return"Sales";if(["Accounting Manager","Commissions Coordinator","Director of Finance","Funding Coordinator"].indexOf(r)>=0)return"Finance";return"AI";}
 
@@ -1316,8 +1391,12 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
       </div>
       <div style={{marginLeft:"auto",display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
         <span style={{fontSize:11,color:th.textMuted,marginRight:8}}>{session.name||session.email} · <a href="/api/auth/signout" style={{color:C.orange,textDecoration:"none"}}>Sign out</a></span>
-        {liveApiData&&<Pill text={"Live - "+pd.totalActiveJobs+" jobs"} color="green"/>}
+        {liveApiData&&!staleCache&&<Pill text={"Live · "+pd.totalActiveJobs+" jobs"} color="green"/>}
+        {staleCache&&<Pill text="Cached" color="blue"/>}
         {liveLoad&&<Pill text="Pulling..." color="amber"/>}
+        <button onClick={function(){pullLive(false);}} disabled={liveLoad} title="Refresh live Pipedrive data" style={{display:"flex",alignItems:"center",gap:5,background:th.inputBg,border:"1px solid "+th.borderPlain,borderRadius:20,padding:"5px 12px",color:th.textMuted,fontSize:11,cursor:liveLoad?"wait":"pointer"}}>
+          <i className="ti ti-refresh" style={{fontSize:13}} aria-hidden="true"/>{liveLoad?"...":"Refresh"}
+        </button>
         <span style={{background:C.green+"12",border:"1px solid "+C.green+"30",borderRadius:20,padding:"4px 10px",fontSize:11,fontWeight:500,color:C.green}}>Read-only</span>
         <button onClick={function(){setDark(function(d){return !d;});}} style={{display:"flex",alignItems:"center",gap:5,background:th.inputBg,border:"1px solid "+th.borderPlain,borderRadius:20,padding:"5px 12px",color:th.textMuted,fontSize:11,cursor:"pointer"}}>
           <i className={"ti ti-"+(dark?"sun":"moon")} style={{fontSize:13}} aria-hidden="true"/>{dark?"Light":"Dark"}
@@ -1349,7 +1428,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
     </div>
 
     {/* SETUP */}
-    {tab==="Setup"&&<div>
+    {isAdmin&&tab==="Setup"&&<div>
       <SubTab tabs={["General","KPI Mapping","Pipedrive Fields"]} active={stab} onChange={setStab} th={th}/>
       {stab==="General"&&<div style={{display:"flex",flexDirection:"column",gap:"1rem"}}>
         <div style={glass}>
@@ -1511,7 +1590,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
     </div>}
 
     {/* SEND */}
-    {tab==="Send"&&<div style={{display:"flex",flexDirection:"column",gap:"1rem"}}>
+    {isAdmin&&tab==="Send"&&<div style={{display:"flex",flexDirection:"column",gap:"1rem"}}>
       <div style={glass}>
         <SLabel icon="ti-clock-play" text="Automated schedule"/>
         <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:10}}>
@@ -1552,7 +1631,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
     </div>}
 
     {/* AUDIT */}
-    {tab==="Audit"&&<div>
+    {isAdmin&&tab==="Audit"&&<div>
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:"1rem",flexWrap:"wrap"}}>
         <p style={{margin:0,fontSize:13,color:th.textMuted,flex:1}}>{audit.length} entries</p>
         <button onClick={function(){dlCSV(audit,"unicity-audit-"+todayStr()+".csv");}} style={{background:C.blue+"18",border:"1px solid "+C.blue+"44",borderRadius:8,color:C.blue,fontSize:11,fontWeight:500,padding:"6px 12px",cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><i className="ti ti-download" style={{fontSize:13}} aria-hidden="true"/>CSV</button>
@@ -1577,7 +1656,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
     </div>}
 
     {/* RALPH */}
-    {tab==="RALPH"&&<div>
+    {isAdmin&&tab==="RALPH"&&<div>
       <div style={Object.assign({},glass,{marginBottom:"1rem",background:C.purple+"0a",borderColor:C.purple+"30"})}>
         <p style={{margin:0,fontSize:13,fontWeight:500,color:C.purple}}>RALPH - Repair, Annotate, Learn, Patch, Harden</p>
         <p style={{margin:0,fontSize:11,color:th.textMuted,marginTop:3}}>User feedback flows here. AI Engineers review, patch, and document fixes.</p>
