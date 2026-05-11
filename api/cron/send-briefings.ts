@@ -10,7 +10,7 @@ const TEAM = [
   { name: "Aidon Paris", title: "Warehouse Manager", role: "Warehouse Manager", email: "aparis@unicitysolar.com", boards: ["Installation"] },
   { name: "Anthony Cowan", title: "Engineering Coordinator", role: "Engineering Coordinator", email: "acowan@unicitysolar.com", boards: ["Design", "Permit"] },
   { name: "Dan Sperruzzi", title: "President of Sales", role: "President of Sales", email: "dsperruzzi@unicitysolar.com", boards: ["Sales"] },
-  { name: "Stephen Farrell", title: "AI Back-End Developer", role: "AI Back-End Developer", email: "stephen@unicityhome.com", boards: "all" as "all" | string[] },
+  { name: "Stephen Farrell", title: "Owner (dev)", role: "Owner", email: "stephen@unicityhome.com", boards: "all" as "all" | string[] },
 ];
 
 const LOGO_URL = "https://unicity-kpi.vercel.app/Unicity_Solar_Logo_only.png";
@@ -166,11 +166,21 @@ async function pullPipedrive(domain: string, apiKey: string): Promise<any> {
       if (isNaN(changeTime)) return false;
       return Date.now() - changeTime < 86400000;
     })
-    .map((d: any) => ({
-      title: d.title || `Deal ${d.id}`,
-      value: Number(d.value || 0),
-      url: `https://${domain}.pipedrive.com/deal/${d.id}`,
-    }));
+    .map((d: any) => {
+      // Find the deal's current pipeline + stage names
+      const stage = stagesArr.find((s: any) => s.id === d.stage_id);
+      const pipeline = pipelinesArr.find((p: any) => p.id === d.pipeline_id);
+      return {
+        id: d.id,
+        title: d.title || `Deal ${d.id}`,
+        value: Number(d.value || 0),
+        url: `https://${domain}.pipedrive.com/deal/${d.id}`,
+        ownerName: d.owner_name || "Unassigned",
+        boardName: pipeline?.name || "Unknown",
+        stageName: stage?.name || "Unknown",
+      };
+    })
+    .sort((a: any, b: any) => b.value - a.value);
 
   return {
     totalActiveJobs: dealsArr.length,
@@ -339,6 +349,10 @@ function buildEmail(person: typeof TEAM[number], pd: any, dataSource: string): s
       ${priorities}
     </div>`;
 
+  // ── Owner-level deep section: stage breakdowns, rep distribution, all stalled, movements ──
+  const isOwner = /(owner|ceo|coo|vp)/i.test(person.role);
+  const ownerSection = (isOwner && pd) ? buildOwnerSection(pd, myStalled, myMoved) : "";
+
   const footer = `
     <div style="padding:16px 24px;background:#1F2125;text-align:center;border-top:1px solid rgba(255,255,255,0.06);">
       <a href="${DASHBOARD_URL}" style="display:inline-block;background:linear-gradient(135deg,#F28F1D,#D4721A);color:#fff;padding:8px 18px;border-radius:6px;text-decoration:none;font-weight:500;font-size:13px;">Open dashboard &rarr;</a>
@@ -349,8 +363,178 @@ function buildEmail(person: typeof TEAM[number], pd: any, dataSource: string): s
     </div>`;
 
   return `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;max-width:640px;margin:0 auto;background:#24262B;color:#F0F0F0;border-radius:8px;overflow:hidden;">
-    ${header}${summaryCard}${stalledList}${boardSection}${prioritySection}${footer}
+    ${header}${summaryCard}${stalledList}${boardSection}${prioritySection}${ownerSection}${footer}
   </div>`;
+}
+
+// ─────────────────────────────────────────────
+// Owner-level deep section: rendered only for Owner/CEO/COO/VP recipients.
+// Adds: per-board stage breakdowns, rep distribution, all stalled list with
+// aging cohorts, and yesterday's stage movements.
+// ─────────────────────────────────────────────
+function buildOwnerSection(pd: any, allStalled: any[], movedDeals: any[]): string {
+  // ── (1) Aging cohorts: bucket stalled deals by days-stuck ──
+  const cohorts = { fresh: [] as any[], building: [] as any[], serious: [] as any[], critical: [] as any[] };
+  allStalled.forEach((s) => {
+    if (s.days <= 14) cohorts.fresh.push(s);
+    else if (s.days <= 30) cohorts.building.push(s);
+    else if (s.days <= 60) cohorts.serious.push(s);
+    else cohorts.critical.push(s);
+  });
+  const cohortValue = (arr: any[]) => arr.reduce((sum, d) => sum + d.value, 0);
+  const cohortCard = (label: string, range: string, items: any[], color: string) => `
+    <td style="width:25%;padding:10px 8px;vertical-align:top;background:${color}0d;border:1px solid ${color}22;border-radius:6px;">
+      <div style="font-size:10px;color:${color};text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">${label}</div>
+      <div style="font-size:11px;color:#6B6266;margin:2px 0 6px;">${range}</div>
+      <div style="font-size:22px;color:#F0F0F0;font-weight:700;line-height:1;">${items.length}</div>
+      <div style="font-size:11px;color:#897C80;margin-top:4px;">${fmtMoney(cohortValue(items))}</div>
+    </td>`;
+  const cohortRow = `
+    <table style="width:100%;border-collapse:separate;border-spacing:6px 0;">
+      <tr>
+        ${cohortCard("Fresh", "7-14 days", cohorts.fresh, "#F5A623")}
+        ${cohortCard("Building", "15-30 days", cohorts.building, "#F28F1D")}
+        ${cohortCard("Serious", "31-60 days", cohorts.serious, "#EF4444")}
+        ${cohortCard("Critical", "61+ days", cohorts.critical, "#B91C1C")}
+      </tr>
+    </table>`;
+
+  // ── (2) Rep distribution: who's holding the most stalled deals/value ──
+  const byRep: Record<string, { count: number; value: number; deals: any[] }> = {};
+  allStalled.forEach((s) => {
+    const r = s.ownerName || "Unassigned";
+    if (!byRep[r]) byRep[r] = { count: 0, value: 0, deals: [] };
+    byRep[r].count++;
+    byRep[r].value += s.value;
+    byRep[r].deals.push(s);
+  });
+  const repRows = Object.entries(byRep)
+    .sort(([, a], [, b]) => b.value - a.value)
+    .slice(0, 8)
+    .map(([rep, data]) => `
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+        <td style="padding:8px 0;font-size:13px;color:#F0F0F0;">${escHtml(rep)}</td>
+        <td style="padding:8px 0;font-size:13px;color:#F0F0F0;text-align:right;">${data.count}</td>
+        <td style="padding:8px 0;font-size:13px;color:#F0F0F0;text-align:right;">${fmtMoney(data.value)}</td>
+      </tr>`).join("");
+  const repSection = Object.keys(byRep).length > 0 ? `
+    <div style="margin-top:18px;">
+      <div style="font-size:11px;color:#897C80;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:8px;">Stalled deals by owner</div>
+      <table style="width:100%;border-collapse:collapse;">
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+          <td style="padding:6px 0;font-size:10px;color:#6B6266;text-transform:uppercase;">Owner</td>
+          <td style="padding:6px 0;font-size:10px;color:#6B6266;text-align:right;">Stalled</td>
+          <td style="padding:6px 0;font-size:10px;color:#6B6266;text-align:right;">Value</td>
+        </tr>
+        ${repRows}
+      </table>
+    </div>` : "";
+
+  // ── (3) Per-board stage breakdown — only boards with deals, top 3 stages each ──
+  const boardBreakdownRows = Object.keys(pd.boardData)
+    .filter((b) => pd.boardData[b].totalDeals > 0)
+    .sort((a, b) => pd.boardData[b].totalDeals - pd.boardData[a].totalDeals)
+    .map((boardName) => {
+      const board = pd.boardData[boardName];
+      const topStages = board.stages
+        .filter((s: any) => s.count > 0)
+        .sort((a: any, b: any) => b.count - a.count)
+        .slice(0, 3);
+      const boardStalledHere = allStalled.filter((s: any) => s.board === boardName);
+      const stageRows = topStages.map((s: any) => {
+        const stageStalled = boardStalledHere.filter((b: any) => b.stage === s.name).length;
+        const stalledFlag = stageStalled > 0
+          ? `<span style="color:#EF4444;font-size:11px;font-weight:500;margin-left:6px;">${stageStalled} stalled</span>`
+          : "";
+        return `<div style="padding:4px 0;font-size:12px;color:#897C80;">
+          ${escHtml(s.name)} <span style="color:#F0F0F0;font-weight:500;">${s.count}</span>
+          <span style="color:#6B6266;"> · ${s.avgDays}d avg</span>
+          ${stalledFlag}
+        </div>`;
+      }).join("");
+      const moreStages = board.stages.filter((s: any) => s.count > 0).length - topStages.length;
+      const moreStagesNote = moreStages > 0
+        ? `<div style="font-size:11px;color:#6B6266;margin-top:4px;">+ ${moreStages} more stage${moreStages > 1 ? "s" : ""}</div>`
+        : "";
+      return `<tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+        <td style="padding:10px 0;vertical-align:top;">
+          <div style="font-size:13px;color:#F0F0F0;font-weight:500;">${escHtml(boardName)}</div>
+          <div style="font-size:11px;color:#897C80;margin-top:2px;">${board.totalDeals} open · ${boardStalledHere.length} stalled</div>
+        </td>
+        <td style="padding:10px 0;vertical-align:top;">${stageRows}${moreStagesNote}</td>
+      </tr>`;
+    }).join("");
+  const boardBreakdownSection = boardBreakdownRows ? `
+    <div style="margin-top:18px;">
+      <div style="font-size:11px;color:#897C80;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:8px;">Per-board stage breakdown</div>
+      <table style="width:100%;border-collapse:collapse;">${boardBreakdownRows}</table>
+      <div style="margin-top:8px;font-size:10px;color:#6B6266;line-height:1.4;">
+        Top 3 stages by deal count per board. View all stages on the dashboard.
+      </div>
+    </div>` : "";
+
+  // ── (4) Yesterday's movements: list, not count ──
+  const movedRows = movedDeals.slice(0, 8).map((m: any) => `
+    <a href="${escHtml(m.url)}" style="display:block;text-decoration:none;color:inherit;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
+      <table style="width:100%;border-collapse:collapse;">
+        <tr>
+          <td style="vertical-align:top;">
+            <div style="font-size:12px;color:#F0F0F0;">${escHtml(m.title)}</div>
+            <div style="font-size:10px;color:#6B6266;margin-top:2px;">${escHtml(m.boardName)} &rsaquo; ${escHtml(m.stageName)} &middot; ${escHtml(m.ownerName)}</div>
+          </td>
+          <td style="vertical-align:top;text-align:right;width:70px;font-size:11px;color:#897C80;">${fmtMoney(m.value)}</td>
+        </tr>
+      </table>
+    </a>`).join("");
+  const moveSection = movedDeals.length > 0 ? `
+    <div style="margin-top:18px;">
+      <div style="font-size:11px;color:#897C80;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:8px;">Moved in last 24 hours</div>
+      ${movedRows}
+      ${movedDeals.length > 8 ? `<div style="font-size:11px;color:#6B6266;margin-top:6px;">+ ${movedDeals.length - 8} more</div>` : ""}
+    </div>` : `
+    <div style="margin-top:18px;">
+      <div style="font-size:11px;color:#897C80;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:6px;">Moved in last 24 hours</div>
+      <div style="font-size:12px;color:#6B6266;">No stage changes in the last 24 hours.</div>
+    </div>`;
+
+  // ── (5) All stalled deals (beyond the top 5 shown above) ──
+  const remainingStalled = allStalled.slice(5);
+  const allStalledRows = remainingStalled.slice(0, 15).map((s: any) => `
+    <a href="${escHtml(s.url)}" style="display:block;text-decoration:none;color:inherit;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
+      <table style="width:100%;border-collapse:collapse;">
+        <tr>
+          <td style="vertical-align:top;">
+            <div style="font-size:12px;color:#F0F0F0;">${escHtml(s.title)}</div>
+            <div style="font-size:10px;color:#6B6266;margin-top:2px;">${escHtml(s.board)} &rsaquo; ${escHtml(s.stage)} &middot; ${escHtml(s.ownerName)}</div>
+          </td>
+          <td style="vertical-align:top;text-align:right;width:90px;">
+            <div style="font-size:12px;color:#EF4444;font-weight:600;">${s.days}d</div>
+            <div style="font-size:10px;color:#897C80;margin-top:2px;">${fmtMoney(s.value)}</div>
+          </td>
+        </tr>
+      </table>
+    </a>`).join("");
+  const remainingStalledSection = remainingStalled.length > 0 ? `
+    <div style="margin-top:18px;">
+      <div style="font-size:11px;color:#897C80;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:8px;">Remaining stalled (${remainingStalled.length})</div>
+      ${allStalledRows}
+      ${remainingStalled.length > 15 ? `<div style="font-size:11px;color:#6B6266;margin-top:6px;">+ ${remainingStalled.length - 15} more &mdash; <a href="${DASHBOARD_URL}" style="color:#4A9EE0;text-decoration:none;">view all on dashboard</a></div>` : ""}
+    </div>` : "";
+
+  return `
+    <div style="padding:18px 24px;background:#1A1C20;border-top:2px solid rgba(242,143,29,0.4);">
+      <div style="font-size:13px;color:#F28F1D;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:14px;">
+        Owner overview
+      </div>
+      <div style="font-size:11px;color:#897C80;margin-bottom:14px;line-height:1.5;">
+        Deep view across the company. Every section below is filtered for your role and rolls up the same data as the dashboard.
+      </div>
+      ${allStalled.length > 0 ? cohortRow : ""}
+      ${repSection}
+      ${boardBreakdownSection}
+      ${moveSection}
+      ${remainingStalledSection}
+    </div>`;
 }
 
 function getPriorities(role: string): string[] {
