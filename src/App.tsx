@@ -65,18 +65,14 @@ function buildPipelineData(liveApiData) {
         liveStage=lb.stages?lb.stages.find(function(s){return s.name&&s.name.toLowerCase()===sName.toLowerCase();}):null;
       }
 
-      var jobCount=liveStage?liveStage.count:Math.floor(Math.random()*12)+1;
-      var avgDays=liveStage?parseFloat(liveStage.avgDays):(Math.random()*8+0.5);
+      // Only show stage data when it's real. No simulated jobCount/avgDays.
+      var jobCount=liveStage?liveStage.count:0;
+      var avgDays=liveStage?parseFloat(liveStage.avgDays):0;
       var deals=[];
 
       if(liveStage&&liveStage.deals) {
         deals=liveStage.deals.map(function(d) {
-          return {id:d.id,name:d.name||"Unknown",address:"Address from Pipedrive",days:d.days,rep:REPS[Math.floor(Math.random()*REPS.length)],pipedriveUrl:d.pipedriveUrl,notes:[{date:"Today",text:"Live data — notes require /notes endpoint"}],flags:d.days>(threshold||999)?["Past rotting threshold"]:[]};
-        });
-      } else {
-        deals=Array.from({length:jobCount},function(_,k) {
-          var days=Math.floor(Math.random()*16)+1;
-          return {id:"JOB-"+(1000+Math.floor(Math.random()*9000)),name:["Sarah Mitchell","James Cortez","Linda Nguyen","Robert Kwan","Patricia Holt","Carlos Vega","Diane Russo","Tom Becker"][k%8],address:"123 Sample St, Gainesville FL",days:days,rep:REPS[k%REPS.length],pipedriveUrl:"https://app.pipedrive.com/deals/",notes:[{date:"Today",text:"Sample — connect Pipedrive for live data"},{date:"Yesterday",text:"Follow-up scheduled with homeowner."},{date:"2 days ago",text:"Documents uploaded to folder."}],flags:days>(threshold||999)?["Past rotting threshold"]:[]};
+          return {id:d.id,name:d.name||"Unknown",address:"",days:d.days,rep:d.ownerName||"Unassigned",pipedriveUrl:d.pipedriveUrl,notes:[],flags:d.days>(threshold||999)?["Past rotting threshold"]:[]};
         });
       }
 
@@ -86,51 +82,56 @@ function buildPipelineData(liveApiData) {
       boardStuck+=stuckCount;
       deals.forEach(function(d){allDeals.push(Object.assign({},d,{board:bName,stage:sName}));});
 
-      stages[sName]={name:sName,jobCount:jobCount,avgDays:parseFloat(avgDays.toFixed(1)),threshold:threshold,stuckCount:stuckCount,deals:deals,
-        historicalAvg:parseFloat((avgDays*(0.8+Math.random()*0.4)).toFixed(1)),
-        prevPeriodAvg:parseFloat((avgDays*(0.9+Math.random()*0.3)).toFixed(1))};
+      stages[sName]={name:sName,jobCount:jobCount,avgDays:parseFloat(avgDays.toFixed(1)),threshold:threshold,stuckCount:stuckCount,deals:deals};
     });
 
     var boardAvgDays=boardTotalJobs>0?parseFloat((boardTotalDays/boardTotalJobs).toFixed(1)):0;
-    var healthScore=boardStuck===0?85+Math.floor(Math.random()*15):boardStuck<=2?55+Math.floor(Math.random()*25):20+Math.floor(Math.random()*30);
+    // Status now derived from real stuck count vs total — not random
+    var stuckRatio=boardTotalJobs>0?boardStuck/boardTotalJobs:0;
+    var status=stuckRatio>=0.2?"red":stuckRatio>=0.05?"amber":"green";
     totalActiveJobs+=boardTotalJobs;
     totalStuck+=boardStuck;
 
-    boards[bName]={name:bName,region:cfg.region,jobCount:boardTotalJobs,avgDays:boardAvgDays,stuckCount:boardStuck,healthScore:healthScore,status:healthScore>=80?"green":healthScore>=50?"amber":"red",trend:["up","down","flat"][Math.floor(Math.random()*3)],stages:stages,
-      historicalAvg:parseFloat((boardAvgDays*(0.85+Math.random()*0.3)).toFixed(1)),live:!!(liveApiData&&liveApiData.boardData&&liveApiData.boardData[bName])};
+    boards[bName]={name:bName,region:cfg.region,jobCount:boardTotalJobs,avgDays:boardAvgDays,stuckCount:boardStuck,status:status,stages:stages,live:!!(liveApiData&&liveApiData.boardData&&liveApiData.boardData[bName])};
   });
 
-  // End-to-end pipeline speed (simulated journey through all boards)
-  var endToEndDays=Object.values(boards).reduce(function(sum,b){return sum+b.avgDays;},0);
+  // End-to-end: sum of board averages (only boards with deals)
+  var endToEndDays=Object.values(boards).reduce(function(sum,b){return sum+(b.jobCount>0?b.avgDays:0);},0);
 
-  // Bottleneck analysis
+  // Bottleneck detection: stages where avgDays significantly exceeds the board's average
+  // Real definition: avgDays >= 1.5x board avg, minimum 7 days, must have at least 1 deal.
   var bottlenecks=[];
   Object.values(boards).forEach(function(b) {
+    if(b.jobCount===0||b.avgDays===0)return;
+    var threshold=Math.max(7,b.avgDays*1.5);
     Object.values(b.stages).forEach(function(s) {
-      if(s.stuckCount>0||(s.historicalAvg&&s.avgDays>s.historicalAvg*1.2)) {
-        bottlenecks.push({board:b.name,stage:s.name,stuckCount:s.stuckCount,avgDays:s.avgDays,historicalAvg:s.historicalAvg,delta:parseFloat((s.avgDays-s.historicalAvg).toFixed(1)),pctAbove:s.historicalAvg>0?Math.round(((s.avgDays-s.historicalAvg)/s.historicalAvg)*100):0});
+      if(s.jobCount>0&&s.avgDays>=threshold) {
+        bottlenecks.push({
+          board:b.name,
+          stage:s.name,
+          stuckCount:s.jobCount,
+          avgDays:s.avgDays,
+          boardAvg:b.avgDays,
+          pctAbove:b.avgDays>0?Math.round(((s.avgDays-b.avgDays)/b.avgDays)*100):0
+        });
       }
     });
   });
   bottlenecks.sort(function(a,b){return b.pctAbove-a.pctAbove;});
 
-  // Rep performance (owner-level only)
+  // Rep stats from real allDeals data only (real owner names come from Pipedrive)
   var repStats={};
-  REPS.forEach(function(rep) {
-    var repDeals=allDeals.filter(function(d){return d.rep===rep;});
-    var avgDays=repDeals.length?parseFloat((repDeals.reduce(function(s,d){return s+d.days;},0)/repDeals.length).toFixed(1)):0;
-    repStats[rep]={rep:rep,jobCount:repDeals.length,avgDays:avgDays,slowBoards:[]};
+  allDeals.forEach(function(d) {
+    var rep=d.rep||"Unassigned";
+    if(!repStats[rep])repStats[rep]={rep:rep,jobCount:0,totalDays:0};
+    repStats[rep].jobCount++;
+    repStats[rep].totalDays+=d.days||0;
+  });
+  Object.values(repStats).forEach(function(r:any){
+    r.avgDays=r.jobCount>0?parseFloat((r.totalDays/r.jobCount).toFixed(1)):0;
   });
 
-  // Time patterns (simulated)
-  var timePatterns=[
-    {pattern:"Jobs entered Permitting on Mondays average 3.2 days longer than mid-week submissions",severity:"amber",type:"time"},
-    {pattern:"End-of-month volume spikes in New Sale cause 40% slowdown in Engineering intake",severity:"red",type:"volume"},
-    {pattern:"Permit Submitted stage consistently exceeds threshold on weeks 2 and 4 of each month",severity:"amber",type:"time"},
-    {pattern:"R&R jobs scheduled in Q4 average 18% longer uninstall-to-reinstall turnaround",severity:"amber",type:"time"},
-  ];
-
-  return {boards:boards,totalActiveJobs:totalActiveJobs,totalStuck:totalStuck,endToEndDays:parseFloat(endToEndDays.toFixed(1)),bottlenecks:bottlenecks,repStats:repStats,timePatterns:timePatterns,allDeals:allDeals,isLive:!!liveApiData,baselineDays:Math.floor(Math.random()*14)};
+  return {boards:boards,totalActiveJobs:totalActiveJobs,totalStuck:totalStuck,endToEndDays:parseFloat(endToEndDays.toFixed(1)),bottlenecks:bottlenecks,repStats:repStats,allDeals:allDeals,isLive:!!liveApiData};
 }
 
 // ─────────────────────────────────────────────
@@ -651,7 +652,6 @@ function KpiDrillDown({kpiName,pd,memberBoards,role,onClose,th,onNavigateIntelli
                 <span style={{fontSize:12,color:th.textMuted}}>{b.jobCount} jobs</span>
                 <span style={{fontSize:12,color:C.orange}}>{b.avgDays}d avg</span>
                 {b.stuckCount>0&&<Pill text={b.stuckCount+" stuck"} color="red"/>}
-                {b.historicalAvg&&b.avgDays>b.historicalAvg?<span style={{fontSize:11,color:C.red}}>+{(b.avgDays-b.historicalAvg).toFixed(1)}d vs hist</span>:null}
                 <i className={"ti ti-chevron-"+(isExp?"up":"down")} style={{color:th.textMuted,fontSize:12}} aria-hidden="true"/>
               </button>
               {isExp&&<div style={{borderTop:"1px solid "+th.borderPlain,padding:"10px 14px"}}>
@@ -700,9 +700,9 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
   var memberBoards=(member.boards||[]).filter(function(b){return pd.boards[b];});
   var showRepData=canAccess(role,"repData");
 
-  // Heat map colour: green→amber→red based on avgDays relative to threshold
-  function heatColor(avgDays,threshold,historicalAvg){
-    var ref=threshold||historicalAvg||5;
+  // Heat map colour: green→amber→red based on avgDays vs threshold (or fallback)
+  function heatColor(avgDays,threshold){
+    var ref=threshold||7;
     var ratio=avgDays/ref;
     if(ratio<=0.8)return{bg:"rgba(34,197,94,0.25)",text:C.green};
     if(ratio<=1.2)return{bg:"rgba(245,158,11,0.2)",text:C.amber};
@@ -747,13 +747,11 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
         {memberBoards.map(function(bName){
           var b=pd.boards[bName];if(!b)return null;
           var col=b.status==="green"?C.green:b.status==="amber"?C.amber:C.red;
-          var vsHist=b.avgDays>b.historicalAvg?"+":"";
           return <div key={bName} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:th.inputBg,border:"1px solid "+col+"30",borderRadius:11}}>
             <div style={{width:9,height:9,borderRadius:"50%",background:col,boxShadow:"0 0 7px "+col,flexShrink:0}}/>
             <span style={{flex:1,fontSize:13,fontWeight:500,color:th.text}}>{bName}</span>
             <span style={{fontSize:12,color:th.textMuted}}>{b.jobCount} jobs</span>
-            <span style={{fontSize:12,color:C.orange}}>{b.avgDays}d avg</span>
-            <span style={{fontSize:11,color:b.avgDays>b.historicalAvg?C.red:C.green}}>{vsHist}{(b.avgDays-b.historicalAvg).toFixed(1)}d vs hist</span>
+            {b.avgDays>0&&<span style={{fontSize:12,color:C.orange}}>{b.avgDays}d avg</span>}
             {b.stuckCount>0&&<Pill text={b.stuckCount+" stuck"} color="red"/>}
             {b.live&&<Pill text="live" color="green"/>}
           </div>;
@@ -778,7 +776,7 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
             <p style={{margin:"0 0 4px",fontSize:12,fontWeight:500,color:th.text}}>{bName} <span style={{fontSize:11,color:th.textMuted}}>({b.jobCount} jobs, {b.avgDays}d avg)</span></p>
             <div style={{display:"flex",gap:3,flexWrap:"wrap"}}>
               {stages.map(function(s){
-                var hc=heatColor(s.avgDays,s.threshold,s.historicalAvg);
+                var hc=heatColor(s.avgDays,s.threshold);
                 var isExp=heatExpand===bName+s.name;
                 return <div key={s.name} style={{marginBottom:3}}>
                   <button onClick={function(){setHeatExpand(isExp?null:bName+s.name);}} style={{padding:"5px 9px",background:hc.bg,border:"1px solid "+hc.text+"44",borderRadius:7,cursor:"pointer",textAlign:"left"}}>
@@ -788,7 +786,7 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
                   </button>
                   {isExp&&<div style={{background:th.card,border:"1px solid "+th.border,borderRadius:8,padding:"8px 10px",marginTop:3,minWidth:220}}>
                     <p style={{margin:"0 0 6px",fontSize:11,fontWeight:500,color:th.text}}>{s.name} &mdash; {s.jobCount} jobs, avg {s.avgDays}d</p>
-                    <p style={{margin:"0 0 6px",fontSize:11,color:th.textMuted}}>Historical avg: {s.historicalAvg}d &middot; Threshold: {s.threshold?s.threshold+"d":"none"}</p>
+                    <p style={{margin:"0 0 6px",fontSize:11,color:th.textMuted}}>Threshold: {s.threshold?s.threshold+"d":"none"}</p>
                     {s.deals.slice(0,4).map(function(d){return <DealCard key={d.id} deal={d} threshold={s.threshold} th={th}/>;})}
                   </div>}
                 </div>;
@@ -811,9 +809,10 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
       </div>
 
       <p style={{margin:"0 0 8px",fontSize:12,fontWeight:500,color:th.text}}>Top bottlenecks ({pd.bottlenecks.length} detected)</p>
+      <p style={{margin:"0 0 12px",fontSize:11,color:th.textMuted}}>Stages where average days exceeds the board average by 50% or more. Real Pipedrive data.</p>
       <div style={{display:"flex",flexDirection:"column",gap:5,marginBottom:"1.5rem"}}>
         {pd.bottlenecks.slice(0,10).map(function(bn,i){
-          var severity=bn.pctAbove>=40?C.red:bn.pctAbove>=20?C.amber:C.orange;
+          var severity=bn.pctAbove>=80?C.red:bn.pctAbove>=50?C.amber:C.orange;
           return <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:th.inputBg,border:"1px solid "+severity+"33",borderRadius:9}}>
             <div style={{width:7,height:7,borderRadius:"50%",background:severity,boxShadow:"0 0 5px "+severity,flexShrink:0}}/>
             <div style={{flex:1}}>
@@ -822,22 +821,12 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
             </div>
             <div style={{textAlign:"right"}}>
               <p style={{margin:0,fontSize:12,fontWeight:500,color:severity}}>{bn.avgDays}d avg</p>
-              <p style={{margin:0,fontSize:11,color:th.textMuted}}>hist: {bn.historicalAvg}d (+{bn.pctAbove}%)</p>
+              <p style={{margin:0,fontSize:11,color:th.textMuted}}>board: {bn.boardAvg}d (+{bn.pctAbove}%)</p>
             </div>
-            <span style={{fontSize:11,color:C.red,background:C.red+"18",padding:"2px 7px",borderRadius:8,fontWeight:500}}>{bn.stuckCount} stuck</span>
+            <span style={{fontSize:11,color:C.red,background:C.red+"18",padding:"2px 7px",borderRadius:8,fontWeight:500}}>{bn.stuckCount} deals</span>
           </div>;
         })}
-      </div>
-
-      <p style={{margin:"0 0 8px",fontSize:12,fontWeight:500,color:th.text}}>Time and volume patterns</p>
-      <div style={{display:"flex",flexDirection:"column",gap:5,marginBottom:"1.5rem"}}>
-        {pd.timePatterns.map(function(p,i){
-          var col=p.severity==="red"?C.red:C.amber;
-          return <div key={i} style={{display:"flex",gap:10,padding:"8px 12px",background:th.inputBg,border:"1px solid "+col+"33",borderRadius:9}}>
-            <div style={{width:6,height:6,borderRadius:"50%",background:col,marginTop:3,flexShrink:0}}/>
-            <p style={{margin:0,fontSize:12,color:th.text}}>{p.pattern}</p>
-          </div>;
-        })}
+        {pd.bottlenecks.length===0&&<p style={{margin:0,fontSize:13,color:C.green}}>✓ No significant bottlenecks detected. All stages within 50% of their board average.</p>}
       </div>
 
       {showRepData&&<div>
@@ -861,44 +850,12 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
     {sub==="History"&&<div>
       <div style={{display:"flex",gap:6,marginBottom:"1rem",flexWrap:"wrap"}}>
         {RANGES.map(function(r){return <button key={r} onClick={function(){setRange(r);}} style={{padding:"6px 12px",border:"1px solid "+(range===r?C.orange:th.borderPlain),borderRadius:20,background:range===r?C.orange+"18":th.inputBg,color:range===r?C.orange:th.textMuted,fontSize:11,cursor:"pointer",fontWeight:range===r?500:400}}>{r}</button>;})}</div>
-      <div style={{background:C.amber+"0d",border:"1px solid "+C.amber+"22",borderRadius:10,padding:"7px 12px",marginBottom:"1rem"}}>
-        <span style={{fontSize:12,color:C.amber}}>Historical comparison activates after 14-day Pipedrive baseline. Currently showing simulated deltas.</span>
-      </div>
-      <div style={{display:"flex",flexDirection:"column",gap:8}}>
-        {memberBoards.map(function(bName){
-          var b=pd.boards[bName];if(!b)return null;
-          var col=b.status==="green"?C.green:b.status==="amber"?C.amber:C.red;
-          var prevDeals=Math.floor(Math.random()*80)+20;
-          var prevAvg=parseFloat((b.avgDays*(0.85+Math.random()*0.3)).toFixed(1));
-          var dealsDelta=b.jobCount-prevDeals;
-          var avgDelta=parseFloat((b.avgDays-prevAvg).toFixed(1));
-          return <div key={bName} style={{background:th.card,border:"1px solid "+th.border,borderRadius:12,padding:"1rem",borderLeft:"3px solid "+col}}>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
-              <div style={{width:8,height:8,borderRadius:"50%",background:col}}/>
-              <span style={{flex:1,fontSize:13,fontWeight:500,color:th.text}}>{bName}</span>
-              <span style={{fontSize:11,color:th.textMuted}}>{range}</span>
-            </div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:8}}>
-              {[
-                {label:"Active jobs",cur:b.jobCount,prev:prevDeals,unit:"",low:false},
-                {label:"Avg days",cur:b.avgDays,prev:prevAvg,unit:"d",low:true},
-                {label:"Stuck jobs",cur:b.stuckCount,prev:Math.floor(Math.random()*8),unit:"",low:true},
-                {label:"Health score",cur:b.healthScore,prev:Math.floor(Math.random()*40)+50,unit:"",low:false},
-              ].map(function(m){
-                var diff=Number(m.cur)-Number(m.prev);
-                var good=m.low?diff<0:diff>0;
-                var col2=diff===0?C.amber:good?C.green:C.red;
-                var arrow=diff===0?"→":diff>0?"↑":"↓";
-                return <div key={m.label} style={{background:th.inputBg,border:"1px solid "+th.borderPlain,borderRadius:9,padding:"8px 10px"}}>
-                  <p style={{margin:"0 0 3px",fontSize:11,color:th.textMuted}}>{m.label}</p>
-                  <p style={{margin:"0 0 2px",fontSize:16,fontWeight:500,color:th.text}}>{m.cur}{m.unit}</p>
-                  <span style={{fontSize:11,color:col2,fontWeight:500}}>{arrow} {Math.abs(diff).toFixed(1)}{m.unit}</span>
-                  <p style={{margin:"2px 0 0",fontSize:11,color:th.textMuted}}>vs {m.prev}{m.unit} prior</p>
-                </div>;
-              })}
-            </div>
-          </div>;
-        })}
+      <div style={{background:th.card,border:"1px solid "+th.border,borderRadius:12,padding:"2rem 1.5rem",textAlign:"center"}}>
+        <p style={{margin:"0 0 8px",fontSize:14,fontWeight:500,color:th.text}}>Historical comparisons coming soon</p>
+        <p style={{margin:"0 0 4px",fontSize:12,color:th.textMuted,lineHeight:1.5}}>
+          Daily snapshots of pipeline state will start accumulating on the next deploy. Period-over-period comparisons (this week vs last week, etc.) activate once we have at least 14 days of data.
+        </p>
+        <p style={{margin:"12px 0 0",fontSize:11,color:th.textMuted}}>Current snapshot: {pd.totalActiveJobs} active jobs &middot; {pd.totalStuck} stuck &middot; end-to-end {pd.endToEndDays}d</p>
       </div>
     </div>}
   </div>;
@@ -1200,10 +1157,6 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
       });
       lines.push("");
       lines.push("Recommended focus: review the highest-percentage bottleneck with the owning team and identify whether the constraint is process, capacity, or external dependency.");
-    }
-    if(pd.timePatterns&&pd.timePatterns.length>0){
-      lines.push("");
-      lines.push("Patterns observed: "+pd.timePatterns.map(function(p){return p.pattern;}).join("; ")+".");
     }
     setAiSummary(lines.join("\n"));
     setSummaryLoading(false);
