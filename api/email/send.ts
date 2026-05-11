@@ -68,11 +68,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // --- Build the RFC-2822 message ---
-  const boundary = "unicity_" + Date.now();
+  // Subject is MIME-encoded as UTF-8 Base64 (RFC 2047) to preserve em-dashes,
+  // ellipses, and any other non-ASCII characters across all email clients.
   const message = [
     `From: Unicity Solar KPI <${senderEmail}>`,
     `To: ${to}`,
-    `Subject: ${subject}`,
+    `Subject: =?UTF-8?B?${Buffer.from(subject).toString("base64")}?=`,
     `MIME-Version: 1.0`,
     `Content-Type: text/html; charset=UTF-8`,
     ``,

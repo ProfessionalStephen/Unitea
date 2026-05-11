@@ -559,7 +559,7 @@ function todayStr(){return new Date().toISOString().split("T")[0];}
 // ─────────────────────────────────────────────
 // UI ATOMS
 // ─────────────────────────────────────────────
-function UniLogo(){return <svg width="42" height="42" viewBox="0 0 44 44" fill="none"><circle cx="22" cy="22" r="22" fill="#24262B"/><g transform="translate(4,4)"><path d="M18 4C18 4 26 6 30 14C34 22 30 30 22 32" stroke="#F28F1D" strokeWidth="3.2" strokeLinecap="round" fill="none"/><path d="M22 32C22 32 13 31 9 23C5 15 9 7 17 5" stroke="#E8841A" strokeWidth="3.2" strokeLinecap="round" fill="none"/><path d="M4 18C4 18 6 10 14 7C22 4 29 8 31 16" stroke="#F5A623" strokeWidth="3.2" strokeLinecap="round" fill="none"/><path d="M32 22C32 22 30 30 22 33C14 36 7 32 5 24" stroke="#D4721A" strokeWidth="3.2" strokeLinecap="round" fill="none"/></g></svg>;}
+function UniLogo(){return <img src="/Unicity_Solar_Logo_only.png" alt="Unicity Solar" width="42" height="42" style={{display:"block"}}/>;}
 function Avatar({name,size=36}){var ini=name.split(" ").map(function(w){return w[0];}).join("").slice(0,2).toUpperCase();var bg=name.charCodeAt(0)%2===0?C.orange:C.blue;return <div style={{width:size,height:size,borderRadius:"50%",background:bg,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:500,fontSize:size*0.33,flexShrink:0,border:"2px solid "+bg+"44"}}>{ini}</div>;}
 function Pill({text,color="orange",size=11}){var fg=color==="green"?C.green:color==="red"?C.red:color==="amber"?C.amber:color==="blue"?C.blue:color==="purple"?C.purple:C.orange;return <span style={{background:fg+"18",color:fg,border:"1px solid "+fg+"44",fontSize:size,fontWeight:500,padding:"3px 8px",borderRadius:20,whiteSpace:"nowrap"}}>{text}</span>;}
 function SLabel({icon,text}){return <p style={{fontSize:12,fontWeight:500,color:C.orange,letterSpacing:"0.4px",margin:"0 0 10px",display:"flex",alignItems:"center",gap:6}}><i className={"ti "+icon} aria-hidden="true"/>{text}</p>;}
@@ -716,8 +716,13 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
       </div>}
 
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:8,marginBottom:"1rem"}}>
-        {[{l:"Active jobs",v:pd.totalActiveJobs,col:C.orange},{l:"Stuck jobs",v:pd.totalStuck,col:C.red},{l:"End-to-end avg",v:pd.endToEndDays+"d",col:C.blue},{l:"Industry bench",v:INDUSTRY_BENCHMARK_DAYS+"d",col:th.textMuted}].map(function(s){
-          return <div key={s.l} style={{background:s.col+"0d",border:"1px solid "+s.col+"22",borderRadius:10,padding:"10px 12px",textAlign:"center"}}>
+        {[
+          {l:"Active jobs",v:pd.totalActiveJobs,col:C.orange,tip:"All open deals across every Pipedrive pipeline. Pulled live when you click 'Pull live data'."},
+          {l:"Stuck jobs",v:pd.totalStuck,col:C.red,tip:"Deals in stages where the average days-in-stage is over 30% above that board's overall average. Indicates bottleneck pressure, not individual deal age."},
+          {l:"End-to-end avg",v:pd.endToEndDays+"d",col:C.blue,tip:"Sum of average days-in-stage across all your boards. Approximates total pipeline time from first stage to install."},
+          {l:"Industry bench",v:INDUSTRY_BENCHMARK_DAYS+"d",col:th.textMuted,tip:"Industry average end-to-end pipeline time. For comparison only — your number above is what matters."}
+        ].map(function(s){
+          return <div key={s.l} title={s.tip} style={{background:s.col+"0d",border:"1px solid "+s.col+"22",borderRadius:10,padding:"10px 12px",textAlign:"center",cursor:"help"}}>
             <p style={{margin:0,fontSize:20,fontWeight:500,color:s.col}}>{s.v}</p>
             <p style={{margin:0,fontSize:11,color:th.textMuted}}>{s.l}</p>
           </div>;
@@ -1649,6 +1654,7 @@ export default function App(){
   if(!session.signedIn){
     return <div style={{minHeight:"100vh",background:"#1A1C20",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"system-ui,sans-serif",padding:"2rem"}}>
       <div style={{background:"#2E3138",border:"1px solid rgba(242,143,29,0.2)",borderRadius:16,padding:"2.5rem 2rem",maxWidth:420,textAlign:"center"}}>
+        <img src="/Unicity_Solar_Logo_only.png" alt="Unicity Solar" width="64" height="64" style={{display:"block",margin:"0 auto 1rem"}}/>
         <p style={{margin:"0 0 0.5rem",fontSize:22,fontWeight:500,color:"#F0F0F0"}}>Unicity Solar KPI</p>
         <p style={{margin:"0 0 1.5rem",fontSize:13,color:"#897C80"}}>Sign in with your <span style={{color:"#F28F1D"}}>@unicitysolar.com</span> or <span style={{color:"#F28F1D"}}>@unicityhome.com</span> account.</p>
         <a href="/api/auth/google/start" style={{display:"inline-block",background:"linear-gradient(135deg,#F28F1D,#D4721A)",color:"#fff",padding:"11px 28px",borderRadius:10,textDecoration:"none",fontWeight:500,fontSize:14}}>Sign in with Google</a>
