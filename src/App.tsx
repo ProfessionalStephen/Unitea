@@ -716,13 +716,6 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
       {pd.isLive&&<div style={{background:C.green+"0d",border:"1px solid "+C.green+"22",borderRadius:10,padding:"7px 12px",marginBottom:"1rem"}}>
         <span style={{fontSize:12,color:C.green}}>Live Pipedrive data &middot; {pd.totalActiveJobs} active jobs &middot; {pd.totalStuck} stuck</span>
       </div>}
-      {staleCache&&<div style={{background:C.blue+"0d",border:"1px solid "+C.blue+"22",borderRadius:10,padding:"7px 12px",marginBottom:"1rem",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
-        <span style={{fontSize:12,color:C.blue}}>Using cached data from {new Date(staleCache.ts).toLocaleTimeString()} &mdash; will re-attempt to pull live data shortly</span>
-        <button onClick={function(){pullLive(false);}} disabled={liveLoad} style={{background:C.blue+"22",border:"1px solid "+C.blue+"44",borderRadius:6,color:C.blue,fontWeight:500,fontSize:11,padding:"4px 10px",cursor:"pointer",flexShrink:0}}>{liveLoad?"Retrying...":"Retry now"}</button>
-      </div>}
-      {!pd.isLive&&!staleCache&&<div style={{background:C.amber+"0d",border:"1px solid "+C.amber+"22",borderRadius:10,padding:"7px 12px",marginBottom:"1rem"}}>
-        <span style={{fontSize:12,color:C.amber}}>{liveLoad?"Loading live data...":"Simulated data \u2014 Pipedrive unavailable"}</span>
-      </div>}
 
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:8,marginBottom:"1rem"}}>
         {[
@@ -1426,6 +1419,15 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
         <i className={"ti "+t.icon} style={{fontSize:13}} aria-hidden="true"/>{t.id}
       </button>;})}
     </div>
+
+    {/* Data-source status banner — visible across all tabs */}
+    {staleCache&&<div style={{background:C.blue+"0d",border:"1px solid "+C.blue+"22",borderRadius:10,padding:"7px 12px",marginBottom:"1rem",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
+      <span style={{fontSize:12,color:C.blue}}>Using cached data from {new Date(staleCache.ts).toLocaleTimeString()} &mdash; will re-attempt to pull live data shortly</span>
+      <button onClick={function(){pullLive(false);}} disabled={liveLoad} style={{background:C.blue+"22",border:"1px solid "+C.blue+"44",borderRadius:6,color:C.blue,fontWeight:500,fontSize:11,padding:"4px 10px",cursor:liveLoad?"wait":"pointer",flexShrink:0}}>{liveLoad?"Retrying...":"Retry now"}</button>
+    </div>}
+    {!pd.isLive&&!staleCache&&<div style={{background:C.amber+"0d",border:"1px solid "+C.amber+"22",borderRadius:10,padding:"7px 12px",marginBottom:"1rem"}}>
+      <span style={{fontSize:12,color:C.amber}}>{liveLoad?"Loading live data from Pipedrive...":"Simulated data \u2014 Pipedrive unavailable, using fallback numbers"}</span>
+    </div>}
 
     {/* SETUP */}
     {isAdmin&&tab==="Setup"&&<div>
