@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 
 // ─────────────────────────────────────────────
 // THEME
@@ -322,73 +322,6 @@ function buildNeedsAttentionHtml(alerts, pd) {
   return rows;
 }
 
-// Build board health HTML — fully from pipelineData, with per-deal Pipedrive links
-function buildBoardHealthHtml(pd, memberBoards) {
-  var boards = (memberBoards || []).filter(function(b) { return pd.boards[b]; });
-  var sorted = boards.slice().sort(function(a, b) {
-    var o = {red: 0, amber: 1, green: 2};
-    return (o[pd.boards[a].status] || 2) - (o[pd.boards[b].status] || 2);
-  });
-  var gc = boards.filter(function(b) { return pd.boards[b] && pd.boards[b].status === "green"; }).length;
-  var ac = boards.filter(function(b) { return pd.boards[b] && pd.boards[b].status === "amber"; }).length;
-  var rc = boards.filter(function(b) { return pd.boards[b] && pd.boards[b].status === "red"; }).length;
-
-  var boardCards = sorted.map(function(bName) {
-    var b = pd.boards[bName]; if (!b) return "";
-    var col = b.status === "green" ? "#22C55E" : b.status === "amber" ? "#F59E0B" : "#EF4444";
-    var icon = b.status === "green" ? "&#9679;" : b.status === "amber" ? "&#9650;" : "&#10005;";
-    var statusLabel = b.status === "green" ? "Healthy" : b.status === "amber" ? "Watch" : "Critical";
-    var stuckStages = Object.values(b.stages).filter(function(s) { return s.stuckCount > 0; });
-
-    var stageRows = stuckStages.length === 0
-      ? "<p style='margin:0;font-size:12px;color:#22C55E;font-family:Arial,sans-serif;'>No stuck jobs in this board</p>"
-      : stuckStages.map(function(stage) {
-          var dealRows = stage.deals.filter(function(d) { return stage.threshold && d.days > stage.threshold; }).slice(0, 3).map(function(d) {
-            return "<div style='margin:3px 0;padding:5px 8px;background:rgba(255,255,255,0.04);border-radius:5px;'>"
-              + "<table width='100%' cellpadding='0' cellspacing='0' border='0'><tr>"
-              + "<td style='font-size:11px;color:#F0F0F0;font-family:Arial,sans-serif;'>" + d.name + "</td>"
-              + "<td style='font-size:11px;color:#EF4444;text-align:center;font-family:Arial,sans-serif;'>" + d.days + "d</td>"
-              + "<td style='font-size:11px;text-align:right;font-family:Arial,sans-serif;'><a href='" + d.pipedriveUrl + "' style='color:#4A9EE0;text-decoration:none;'>Open &rarr;</a></td>"
-              + "</tr></table>"
-              + "</div>";
-          }).join("");
-
-          return "<div style='margin-bottom:7px;padding:8px 10px;background:rgba(239,68,68,0.08);border-left:3px solid #EF4444;border-radius:0 6px 6px 0;'>"
-            + "<p style='margin:0 0 5px;font-size:12px;color:#EF4444;font-weight:500;font-family:Arial,sans-serif;'>"
-            + stage.name + " &mdash; " + stage.stuckCount + " stuck (avg " + stage.avgDays + "d)"
-            + (stage.threshold ? " &middot; threshold: " + stage.threshold + "d" : "") + "</p>"
-            + (dealRows || "<p style='margin:0;font-size:11px;color:#897C80;font-family:Arial,sans-serif;'>No deals past threshold</p>")
-            + "</div>";
-        }).join("");
-
-    return "<details style='margin-bottom:7px;border-radius:9px;overflow:hidden;border:1px solid " + col + "40;'>"
-      + "<summary style='padding:10px 14px;background:" + col + "15;cursor:pointer;list-style:none;font-family:Arial,sans-serif;'>"
-      + "<table width='100%' cellpadding='0' cellspacing='0' border='0'><tr>"
-      + "<td style='color:" + col + ";font-size:13px;font-weight:500;'>" + icon + " " + bName + " &mdash; " + b.jobCount + " jobs</td>"
-      + "<td style='text-align:right;color:" + col + ";font-size:11px;'>" + b.avgDays + "d avg &middot; " + statusLabel + " &#9662;</td>"
-      + "</tr></table></summary>"
-      + "<div style='padding:12px 14px;background:#1E2228;font-family:Arial,sans-serif;'>"
-      + "<p style='margin:0 0 8px;font-size:11px;color:#897C80;'>Avg days: " + b.avgDays + "d &middot; Historical avg: " + b.historicalAvg + "d &middot; " + stuckStages.length + " stuck stages</p>"
-      + stageRows
-      + "</div></details>";
-  }).join("");
-
-  var summaryRow = "<table width='100%' cellpadding='0' cellspacing='0' border='0' style='margin-bottom:14px;'><tr>"
-    + "<td width='32%' style='text-align:center;padding:10px 6px;background:rgba(34,197,94,0.1);border-radius:8px;border:1px solid rgba(34,197,94,0.25);'><p style='margin:0;font-size:20px;font-weight:500;color:#22C55E;font-family:Arial,sans-serif;'>" + gc + "</p><p style='margin:3px 0 0;font-size:11px;color:#22C55E;font-family:Arial,sans-serif;'>&#9679; Healthy</p></td>"
-    + "<td width='4%'></td>"
-    + "<td width='28%' style='text-align:center;padding:10px 6px;background:rgba(245,158,11,0.1);border-radius:8px;border:1px solid rgba(245,158,11,0.25);'><p style='margin:0;font-size:20px;font-weight:500;color:#F59E0B;font-family:Arial,sans-serif;'>" + ac + "</p><p style='margin:3px 0 0;font-size:11px;color:#F59E0B;font-family:Arial,sans-serif;'>&#9650; Watch</p></td>"
-    + "<td width='4%'></td>"
-    + "<td width='32%' style='text-align:center;padding:10px 6px;background:rgba(239,68,68,0.1);border-radius:8px;border:1px solid rgba(239,68,68,0.25);'><p style='margin:0;font-size:20px;font-weight:500;color:#EF4444;font-family:Arial,sans-serif;'>" + rc + "</p><p style='margin:3px 0 0;font-size:11px;color:#EF4444;font-family:Arial,sans-serif;'>&#10005; Critical</p></td>"
-    + "</tr></table>";
-
-  return "<div style='padding:18px 22px;background:#1A1D22;'>"
-    + "<p style='margin:0 0 12px;font-size:14px;font-weight:500;color:#F28F1D;font-family:Arial,sans-serif;'>Board health overview</p>"
-    + summaryRow
-    + "<div style='width:100%;'>" + boardCards + "</div>"
-    + "<p style='margin:10px 0 0;font-size:11px;color:#897C80;text-align:center;font-family:Arial,sans-serif;'>End-to-end pipeline avg: " + pd.endToEndDays + "d &middot; Industry benchmark: " + INDUSTRY_BENCHMARK_DAYS + "d</p>"
-    + "</div>";
-}
-
 // Master template assembler — fixed structure, no variation
 function assembleEmail(person, content, kpiTableHtml, needsAttentionHtml, boardHealthHtml, isMonday, isOwnerLevel) {
   var divider = "<div style='height:1px;background:rgba(255,255,255,0.08);margin:0;'></div>";
@@ -503,7 +436,7 @@ function getPriorities(person,pd){
 }
 
 // Build standalone board health block injected into preview emails for nested-access roles.
-// Uses pipelineData directly — no AI, no duplication of buildBoardHealthHtml.
+// Uses pipelineData directly — no AI.
 function buildEmailHealthSection(pd, memberBoards) {
   var boards=(memberBoards||[]).filter(function(b){return pd.boards[b];});
   var sorted=boards.slice().sort(function(a,b){var o={red:0,amber:1,green:2};var sa=pd.boards[a]?pd.boards[a].status:"green";var sb=pd.boards[b]?pd.boards[b].status:"green";return(o[sa]||2)-(o[sb]||2);});
@@ -700,6 +633,17 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
   var memberBoards=(member.boards||[]).filter(function(b){return pd.boards[b];});
   var showRepData=canAccess(role,"repData");
 
+  // Snapshot accumulation state — fetched lazily when History sub-tab opens
+  var [snapInfo,setSnapInfo]=useState({loading:false,loaded:false,count:0,oldest:null,newest:null,error:null});
+  useEffect(function(){
+    if(sub!=="History"||snapInfo.loaded||snapInfo.loading)return;
+    setSnapInfo(function(s){return Object.assign({},s,{loading:true});});
+    fetch("/api/snapshots/list",{credentials:"include"})
+      .then(function(r){return r.ok?r.json():Promise.reject(new Error("HTTP "+r.status));})
+      .then(function(j){setSnapInfo({loading:false,loaded:true,count:j.count||0,oldest:j.oldest,newest:j.newest,error:null});})
+      .catch(function(e){setSnapInfo({loading:false,loaded:true,count:0,oldest:null,newest:null,error:e.message||"fetch failed"});});
+  },[sub,snapInfo.loaded,snapInfo.loading]);
+
   // Heat map colour: green→amber→red based on avgDays vs threshold (or fallback)
   function heatColor(avgDays,threshold){
     var ref=threshold||7;
@@ -851,11 +795,31 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
       <div style={{display:"flex",gap:6,marginBottom:"1rem",flexWrap:"wrap"}}>
         {RANGES.map(function(r){return <button key={r} onClick={function(){setRange(r);}} style={{padding:"6px 12px",border:"1px solid "+(range===r?C.orange:th.borderPlain),borderRadius:20,background:range===r?C.orange+"18":th.inputBg,color:range===r?C.orange:th.textMuted,fontSize:11,cursor:"pointer",fontWeight:range===r?500:400}}>{r}</button>;})}</div>
       <div style={{background:th.card,border:"1px solid "+th.border,borderRadius:12,padding:"2rem 1.5rem",textAlign:"center"}}>
-        <p style={{margin:"0 0 8px",fontSize:14,fontWeight:500,color:th.text}}>Historical comparisons coming soon</p>
-        <p style={{margin:"0 0 4px",fontSize:12,color:th.textMuted,lineHeight:1.5}}>
-          Daily snapshots of pipeline state will start accumulating on the next deploy. Period-over-period comparisons (this week vs last week, etc.) activate once we have at least 14 days of data.
-        </p>
-        <p style={{margin:"12px 0 0",fontSize:11,color:th.textMuted}}>Current snapshot: {pd.totalActiveJobs} active jobs &middot; {pd.totalStuck} stuck &middot; end-to-end {pd.endToEndDays}d</p>
+        {snapInfo.loading?
+          <p style={{margin:0,fontSize:13,color:th.textMuted}}>Loading snapshot index…</p>
+        :snapInfo.error?
+          <div>
+            <p style={{margin:"0 0 6px",fontSize:14,fontWeight:500,color:C.red}}>Snapshot store unavailable</p>
+            <p style={{margin:0,fontSize:11,color:th.textMuted}}>{snapInfo.error}. Verify Vercel Blob is enabled and BLOB_READ_WRITE_TOKEN is set.</p>
+          </div>
+        :snapInfo.count===0?
+          <div>
+            <p style={{margin:"0 0 8px",fontSize:14,fontWeight:500,color:th.text}}>No snapshots stored yet</p>
+            <p style={{margin:"0 0 4px",fontSize:12,color:th.textMuted,lineHeight:1.5}}>Daily snapshots begin after the next cron run (live Pipedrive data only). Period-over-period comparisons activate once at least 14 days have accumulated.</p>
+            <p style={{margin:"12px 0 0",fontSize:11,color:th.textMuted}}>Current snapshot: {pd.totalActiveJobs} active jobs &middot; {pd.totalStuck} stuck &middot; end-to-end {pd.endToEndDays}d</p>
+          </div>
+        :<div>
+          <p style={{margin:"0 0 8px",fontSize:14,fontWeight:500,color:th.text}}>
+            {snapInfo.count} snapshot{snapInfo.count===1?"":"s"} stored
+            {snapInfo.count<14?" — "+(14-snapInfo.count)+" more until comparisons activate":""}
+          </p>
+          <p style={{margin:"0 0 4px",fontSize:12,color:th.textMuted}}>
+            Oldest: {snapInfo.oldest} &middot; Newest: {snapInfo.newest}
+          </p>
+          {snapInfo.count>=14?
+            <p style={{margin:"12px 0 0",fontSize:12,color:C.green}}>Comparison engine ready. Pick a range above.</p>
+          :<p style={{margin:"12px 0 0",fontSize:11,color:th.textMuted}}>Current snapshot: {pd.totalActiveJobs} active jobs &middot; {pd.totalStuck} stuck &middot; end-to-end {pd.endToEndDays}d</p>}
+        </div>}
       </div>
     </div>}
   </div>;
@@ -1414,7 +1378,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
           <SLabel icon="ti-clock" text="Send schedule"/>
           <div style={{display:"flex",alignItems:"center",gap:14}}>
             <input type="time" value={sendTime} onChange={function(e){setSendTime(e.target.value);}} style={Object.assign({},iS,{width:130,color:C.orange,fontWeight:500,fontSize:18})}/>
-            <div><p style={{margin:0,fontSize:13,color:th.text,fontWeight:500}}>Weekdays · Mon-Fri</p><p style={{margin:"2px 0 0",fontSize:11,color:th.textMuted}}>Server schedule: 7am ET · {team.length} recipients · managed via Vercel cron</p></div>
+            <div><p style={{margin:0,fontSize:13,color:th.text,fontWeight:500}}>Weekdays · Mon-Fri</p><p style={{margin:"2px 0 0",fontSize:11,color:th.textMuted}}>Server schedule: 11:00 UTC (7am EDT / 6am EST) · {team.length} recipients · managed via Vercel cron</p></div>
           </div>
         </div>
         <div style={glass}>

@@ -1,16 +1,27 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { OAuth2Client } from "googleapis-common";
+import { writeSnapshot } from "../_lib/snapshot";
 
+// ─────────────────────────────────────────────────────────────
+// CANONICAL TEAM (recipient list)
+// MUST stay in sync with TEAM_INIT in src/App.tsx — only emailed
+// members from there are mirrored here. Board names MUST match
+// keys in BOARDS (src/App.tsx).
+//
+// TODO: extract to shared module (src/shared/team.ts) so frontend
+// and cron read one source. Until then: when adding/changing an
+// emailed teammate in App.tsx, also update this array.
+// ─────────────────────────────────────────────────────────────
 const TEAM = [
-  { name: "Jordan Lee", title: "Owner", role: "Owner", email: "jordan@unicitysolar.com", boards: "all" as "all" | string[] },
-  { name: "Mallory Amend", title: "COO", role: "COO", email: "mamend@unicitysolar.com", boards: "all" as "all" | string[] },
-  { name: "Josh Labarre", title: "VP of Operations", role: "VP of Operations", email: "josh@unicitysolar.com", boards: "all" as "all" | string[] },
-  { name: "Julie Schultz", title: "Office Manager", role: "Office Manager", email: "jschultz@unicitysolar.com", boards: ["Welcome", "Funding"] },
-  { name: "Julio Valdes", title: "Installation Manager", role: "Installation Manager", email: "jvaldes@unicitysolar.com", boards: ["Installation"] },
-  { name: "Aidon Paris", title: "Warehouse Manager", role: "Warehouse Manager", email: "aparis@unicitysolar.com", boards: ["Installation"] },
-  { name: "Anthony Cowan", title: "Engineering Coordinator", role: "Engineering Coordinator", email: "acowan@unicitysolar.com", boards: ["Design", "Permit"] },
-  { name: "Dan Sperruzzi", title: "President of Sales", role: "President of Sales", email: "dsperruzzi@unicitysolar.com", boards: ["Sales"] },
-  { name: "Stephen Farrell", title: "Owner (dev)", role: "Owner", email: "stephen@unicityhome.com", boards: "all" as "all" | string[] },
+  { name: "Jordan Lee",      title: "Owner",                 role: "Owner",                 email: "jordan@unicitysolar.com",     boards: "all" as "all" | string[] },
+  { name: "Mallory Amend",   title: "COO",                   role: "COO",                   email: "mamend@unicitysolar.com",     boards: "all" as "all" | string[] },
+  { name: "Josh Labarre",    title: "VP of Operations",      role: "VP of Operations",      email: "josh@unicitysolar.com",       boards: "all" as "all" | string[] },
+  { name: "Julie Schultz",   title: "Office Manager",        role: "Office Manager",        email: "jschultz@unicitysolar.com",   boards: "all" as "all" | string[] },
+  { name: "Julio Valdes",    title: "Installation Manager",  role: "Installation Manager",  email: "jvaldes@unicitysolar.com",    boards: ["Customer Service", "New Sale", "Scheduling/Coordinating", "R&R"] },
+  { name: "Aidon Paris",     title: "Warehouse Manager",     role: "Warehouse Manager",     email: "aparis@unicitysolar.com",     boards: ["Customer Service", "Scheduling/Coordinating", "R&R", "Inspection", "Net Metering", "Utility Disco"] },
+  { name: "Anthony Cowan",   title: "Engineering Coordinator", role: "Engineering Coordinator", email: "acowan@unicitysolar.com",  boards: ["Engineering"] },
+  { name: "Dan Sperruzzi",   title: "President of Sales",    role: "President of Sales",    email: "dsperruzzi@unicitysolar.com", boards: ["New Sale", "R&R", "Scheduling/Coordinating", "Completed Meter"] },
+  { name: "Stephen Farrell", title: "AI Back-End Developer", role: "AI Back-End Developer", email: "stephen@unicityhome.com",     boards: "all" as "all" | string[] },
 ];
 
 const LOGO_URL = "https://unicity-kpi.vercel.app/Unicity_Solar_Logo_only.png";
@@ -40,7 +51,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const apiKey = process.env.PIPEDRIVE_API_KEY;
   const domain = process.env.PIPEDRIVE_DOMAIN;
   let pipelineData: any = null;
-  let dataSource = "simulated";
+  let dataSource: "live" | "simulated" = "simulated";
 
   if (apiKey && domain) {
     try {
@@ -48,6 +59,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       dataSource = "live";
     } catch (e: any) {
       console.error("Pipedrive pull failed:", e?.message);
+    }
+  }
+
+  // Write daily snapshot before sending emails. Skips on test runs
+  // (CRON_TEST_RECIPIENT) and on simulated data — we only snapshot
+  // real Pipedrive state. Failures here must not block email sends.
+  let snapshotResult: { date: string; pathname: string; bytes: number } | { error: string } | null = null;
+  if (dataSource === "live" && pipelineData && !testRecipient) {
+    try {
+      const entry = await writeSnapshot(pipelineData, dataSource);
+      snapshotResult = { date: entry.date, pathname: entry.pathname, bytes: entry.size };
+    } catch (e: any) {
+      console.error("Snapshot write failed:", e?.message);
+      snapshotResult = { error: e?.message || "snapshot write failed" };
     }
   }
 
@@ -86,6 +111,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const summary = {
     success: true, timestamp: new Date().toISOString(),
     mode: testRecipient ? "test" : "live", dataSource,
+    snapshot: snapshotResult,
     sent: results.filter((r) => r.status === "sent").length,
     failed: results.filter((r) => r.status === "failed").length,
     results,
