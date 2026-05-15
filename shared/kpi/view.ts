@@ -45,6 +45,16 @@ export type PipelineView = {
   activitiesOverdue: number;
   callsDueToday: number;
 
+  // Time-window aggregates — Cycle 5. All counts.
+  installsCompletedYesterday: number;
+  installsScheduledThisWeek: number;
+  permitsSubmittedThisWeek: number;
+  sentToPermittingToday: number;
+  nmaSubmittedThisWeek: number;
+  serviceRequestsToday: number;
+  techniciansScheduledToday: number;
+  inspectionsScheduledToday: number;
+
   // Board/stage-keyed for source-resolved KPIs
   boards: Record<string, NormBoard>;
 };
@@ -87,6 +97,14 @@ export function viewFromFrontend(pd: any): PipelineView {
     activitiesDueToday: Number(pd?.activitiesDueToday || 0),
     activitiesOverdue: Number(pd?.activitiesOverdue || 0),
     callsDueToday: Number(pd?.callsDueToday || 0),
+    installsCompletedYesterday: Number(pd?.installsCompletedYesterday || 0),
+    installsScheduledThisWeek: Number(pd?.installsScheduledThisWeek || 0),
+    permitsSubmittedThisWeek: Number(pd?.permitsSubmittedThisWeek || 0),
+    sentToPermittingToday: Number(pd?.sentToPermittingToday || 0),
+    nmaSubmittedThisWeek: Number(pd?.nmaSubmittedThisWeek || 0),
+    serviceRequestsToday: Number(pd?.serviceRequestsToday || 0),
+    techniciansScheduledToday: Number(pd?.techniciansScheduledToday || 0),
+    inspectionsScheduledToday: Number(pd?.inspectionsScheduledToday || 0),
     boards,
   };
 }
@@ -130,6 +148,14 @@ export function viewFromCron(pd: any): PipelineView {
     activitiesDueToday: Number(pd?.activitiesDueToday || 0),
     activitiesOverdue: Number(pd?.activitiesOverdue || 0),
     callsDueToday: Number(pd?.callsDueToday || 0),
+    installsCompletedYesterday: Number(pd?.installsCompletedYesterday || 0),
+    installsScheduledThisWeek: Number(pd?.installsScheduledThisWeek || 0),
+    permitsSubmittedThisWeek: Number(pd?.permitsSubmittedThisWeek || 0),
+    sentToPermittingToday: Number(pd?.sentToPermittingToday || 0),
+    nmaSubmittedThisWeek: Number(pd?.nmaSubmittedThisWeek || 0),
+    serviceRequestsToday: Number(pd?.serviceRequestsToday || 0),
+    techniciansScheduledToday: Number(pd?.techniciansScheduledToday || 0),
+    inspectionsScheduledToday: Number(pd?.inspectionsScheduledToday || 0),
     boards,
   };
 }

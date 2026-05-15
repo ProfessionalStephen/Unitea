@@ -2,10 +2,10 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { OAuth2Client } from "googleapis-common";
 import { writeSnapshot } from "../_lib/snapshot";
 import { pullPipedrive } from "../_lib/pipedrive";
+import { readKpiConfig } from "../_lib/kpi-config-store";
 import {
   emailedTeam,
   kpisForRole,
-  KPI_INIT,
   type TeamMember,
   type KpiTag,
 } from "../../shared/domain";
@@ -15,10 +15,13 @@ import { resolveKpi, viewFromCron } from "../../shared/kpi";
 // All domain data (TEAM, role→kpis map, KPI configs) imported
 // from ../../shared/domain. Single source of truth shared with
 // the frontend in src/App.tsx and the status endpoint.
+//
+// KPI tag mappings are loaded fresh each cron run from Vercel
+// Blob (config/kpi-tags.json). Falls back to bundled KPI_INIT
+// if the blob is empty/unreadable.
 // ─────────────────────────────────────────────────────────────
 
 const TEAM = emailedTeam();
-const KPI_CONFIGS: KpiTag[] = KPI_INIT;
 const ROLE_KPIS = (role: string) => kpisForRole(role);
 
 const LOGO_URL = "https://unicity-kpi.vercel.app/Unicity_Solar_Logo_only.png";
@@ -28,16 +31,16 @@ const DASHBOARD_URL = "https://unicity-kpi.vercel.app";
 // KPI RESOLUTION — delegates to shared/kpi/resolver
 // One algorithm for production emails and frontend preview.
 // ─────────────────────────────────────────────────────────────
-function findTagFor(name: string): KpiTag | undefined {
-  return KPI_CONFIGS.find((t) => t.name === name);
+function findTagFor(name: string, kpiConfigs: KpiTag[]): KpiTag | undefined {
+  return kpiConfigs.find((t) => t.name === name);
 }
 
-function buildKpiSection(person: TeamMember, pd: any): string {
+function buildKpiSection(person: TeamMember, pd: any, kpiConfigs: KpiTag[]): string {
   const kpis = ROLE_KPIS(person.role);
   if (kpis.length === 0) return "";
   const view = viewFromCron(pd);
   const cells = kpis.map((k) => {
-    const v = resolveKpi(k, findTagFor(k), view);
+    const v = resolveKpi(k, findTagFor(k, kpiConfigs), view);
     return `<td width="33%" style="padding:4px;">
       <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:10px 12px;text-align:center;">
         <p style="margin:0 0 4px;font-size:11px;color:#897C80;">${escHtml(k)}</p>
@@ -145,9 +148,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const results: Array<{ name: string; email: string; status: "sent" | "failed"; messageId?: string; error?: string }> = [];
 
+  // Load KPI configuration once per cron run. Falls back to bundled
+  // KPI_INIT defaults if blob is absent or unreadable.
+  const kpiConfig = await readKpiConfig();
+  const kpiConfigs: KpiTag[] = kpiConfig.tags;
+
   for (const person of recipients) {
     try {
-      const html = buildEmail(person, pipelineData, dataSource);
+      const html = buildEmail(person, pipelineData, dataSource, kpiConfigs);
       const subject = buildSubject(person, pipelineData);
       const messageId = await sendGmail(accessToken, senderEmail, person.email, subject, html);
       results.push({ name: person.name, email: person.email, status: "sent", messageId });
@@ -159,6 +167,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const summary = {
     success: true, timestamp: new Date().toISOString(),
     mode: testRecipient ? "test" : "live", dataSource,
+    kpiConfigSource: kpiConfig.source,
+    kpiConfigUpdatedAt: kpiConfig.updatedAt,
     snapshot: snapshotResult,
     sent: results.filter((r) => r.status === "sent").length,
     failed: results.filter((r) => r.status === "failed").length,
@@ -197,7 +207,7 @@ function buildSubject(person: TeamMember, pd: any): string {
   return `${todayLabel()} · ${myStalled.length} stalled${valuePart}`;
 }
 
-function buildEmail(person: TeamMember, pd: any, dataSource: string): string {
+function buildEmail(person: TeamMember, pd: any, dataSource: string, kpiConfigs: KpiTag[]): string {
   const firstName = person.name.split(" ")[0];
   const personBoards = person.boards;
 
@@ -332,7 +342,7 @@ function buildEmail(person: TeamMember, pd: any, dataSource: string): string {
       </div>
     </div>`;
 
-  const kpiSection = buildKpiSection(person, pd);
+  const kpiSection = buildKpiSection(person, pd, kpiConfigs);
 
   return `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;max-width:640px;margin:0 auto;background:#24262B;color:#F0F0F0;border-radius:8px;overflow:hidden;">
     ${header}${summaryCard}${kpiSection}${stalledList}${boardSection}${prioritySection}${ownerSection}${footer}

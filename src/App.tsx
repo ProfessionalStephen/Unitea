@@ -13,6 +13,7 @@ import {
   PD_FIELDS_FLAT,
 } from "../shared/domain";
 import { resolveKpi, viewFromFrontend } from "../shared/kpi";
+import { mapPullResponse } from "./data/pull-response";
 
 // ─────────────────────────────────────────────
 // THEME
@@ -23,7 +24,6 @@ const C={orange:"#F28F1D",orangeDeep:"#D4721A",green:"#22C55E",amber:"#F59E0B",r
 
 // BOARDS + INDUSTRY_BENCHMARK_DAYS imported from ../shared/domain
 
-const REPS=["Sarah M.","James C.","Linda N.","Robert K.","Patricia H.","Carlos V.","Diane R.","Tom B.","Maria S.","Kevin L."];
 const RANGES=["Week over week","Month over month","Quarter over quarter","Year over year"];
 
 // ─────────────────────────────────────────────
@@ -146,15 +146,9 @@ function buildPipelineData(liveApiData) {
 // PERMISSIONS, canAccess, RT, mB (boardsForRole), mK (kpisForRole),
 // TEAM_INIT, KPI_INIT all imported from ../shared/domain at top of file.
 
-const AUDIT_INIT=[
-  {id:1,ts:"2026-05-09 05:58",user:"Stephen Farrell",action:"KPI tag mapped",detail:"Ready for engineering mapped to Engineering board",type:"kpi",draft:false},
-  {id:2,ts:"2026-05-09 05:55",user:"Aidon Paris",action:"Board access updated",detail:"Heather Pennoyer added Inspection board",type:"access",draft:false},
-];
+const AUDIT_INIT: Array<{id:number;ts:string;user:string;action:string;detail:string;type:string;draft:boolean}>=[];
 
-const RALPH_INIT=[
-  {id:1,ts:"2026-05-08 09:12",reporter:"Mallory Amend",issue:"Critical bottlenecks KPI showing 0 every day",kpi:"Critical bottlenecks",status:"open",stage:"R - Reported",correction:"",aiNote:""},
-  {id:2,ts:"2026-05-07 07:45",reporter:"Dan Sperruzzi",issue:"Pipeline value not matching Pipedrive dashboard",kpi:"Revenue pipeline value",status:"patched",stage:"H - Hardened",correction:"Fixed field mapping to sum all open deal values",aiNote:"Confirmed fix deployed."},
-];
+const RALPH_INIT: Array<{id:number;ts:string;reporter:string;issue:string;kpi:string;status:string;stage:string;correction:string;aiNote:string}>=[];
 
 const RALPH_STAGES=[
   {stage:"R - Reported",desc:"Issue flagged by a user",col:C.red},
@@ -175,7 +169,7 @@ async function fetchPD(_apiKey,setErr,setHealth){
     var p=await res.json();
     if(!res.ok||!p.success){var msg=p.error||("HTTP "+res.status);setErr("Pipedrive: "+msg);setHealth(function(h){return Object.assign({},h,{pd:res.status===401?"invalid key":"unreachable"});});return null;}
     setHealth(function(h){return Object.assign({},h,{pd:"connected",lastPull:new Date().toLocaleTimeString()});});
-    return{boardData:p.boardData,totalDeals:p.totalDeals,pipelines:p.pipelines};
+    return mapPullResponse(p);
   }catch(err:any){setErr("Request failed: "+err.message);setHealth(function(h){return Object.assign({},h,{pd:"request failed"});});return null;}
 }
 
@@ -602,6 +596,40 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
       .catch(function(e){setSnapInfo({loading:false,loaded:true,count:0,oldest:null,newest:null,error:e.message||"fetch failed"});});
   },[sub,snapInfo.loaded,snapInfo.loading]);
 
+  // Range comparison — Cycle 7. Fires whenever the user picks a range pill
+  // on the History tab. Diffs current snapshot against the closest snapshot
+  // on or before the range's baseline date. Server-side: api/snapshots/compare.
+  var [compareInfo,setCompareInfo]=useState<{loading:boolean;status:string|null;rows:any[]|null;currentDate:string|null;baselineDate:string|null;message:string|null;error:string|null}>({loading:false,status:null,rows:null,currentDate:null,baselineDate:null,message:null,error:null});
+  useEffect(function(){
+    if(sub!=="History")return;
+    if(snapInfo.loading||!snapInfo.loaded)return;
+    if(snapInfo.count===0)return;
+    setCompareInfo(function(s){return Object.assign({},s,{loading:true,error:null});});
+    fetch("/api/snapshots/compare?range="+encodeURIComponent(range),{credentials:"include"})
+      .then(function(r){return r.ok?r.json():Promise.reject(new Error("HTTP "+r.status));})
+      .then(function(j){
+        setCompareInfo({
+          loading:false,
+          status:j.status||null,
+          rows:j.rows||null,
+          currentDate:j.currentDate||null,
+          baselineDate:j.baselineDate||null,
+          message:j.message||null,
+          error:null,
+        });
+      })
+      .catch(function(e){
+        setCompareInfo({loading:false,status:"error",rows:null,currentDate:null,baselineDate:null,message:null,error:e.message||"compare failed"});
+      });
+  },[sub,range,snapInfo.loaded,snapInfo.loading,snapInfo.count]);
+
+  function fmtDiffValue(format,n){
+    if(format==="money"){if(Math.abs(n)>=1_000_000)return"$"+(n/1_000_000).toFixed(1)+"M";if(Math.abs(n)>=1_000)return"$"+Math.round(n/1_000)+"k";return"$"+Math.round(n);}
+    if(format==="days")return n+"d";
+    if(format==="percent")return n.toFixed(1)+"%";
+    return String(n);
+  }
+
   // Heat map colour: green→amber→red based on avgDays vs threshold (or fallback)
   function heatColor(avgDays,threshold){
     var ref=threshold||7;
@@ -752,31 +780,53 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
     {sub==="History"&&<div>
       <div style={{display:"flex",gap:6,marginBottom:"1rem",flexWrap:"wrap"}}>
         {RANGES.map(function(r){return <button key={r} onClick={function(){setRange(r);}} style={{padding:"6px 12px",border:"1px solid "+(range===r?C.orange:th.borderPlain),borderRadius:20,background:range===r?C.orange+"18":th.inputBg,color:range===r?C.orange:th.textMuted,fontSize:11,cursor:"pointer",fontWeight:range===r?500:400}}>{r}</button>;})}</div>
-      <div style={{background:th.card,border:"1px solid "+th.border,borderRadius:12,padding:"2rem 1.5rem",textAlign:"center"}}>
+      <div style={{background:th.card,border:"1px solid "+th.border,borderRadius:12,padding:"1.25rem 1.5rem"}}>
         {snapInfo.loading?
-          <p style={{margin:0,fontSize:13,color:th.textMuted}}>Loading snapshot index…</p>
+          <p style={{margin:0,fontSize:13,color:th.textMuted,textAlign:"center"}}>Loading snapshot index…</p>
         :snapInfo.error?
-          <div>
+          <div style={{textAlign:"center"}}>
             <p style={{margin:"0 0 6px",fontSize:14,fontWeight:500,color:C.red}}>Snapshot store unavailable</p>
             <p style={{margin:0,fontSize:11,color:th.textMuted}}>{snapInfo.error}. Verify Vercel Blob is enabled and BLOB_READ_WRITE_TOKEN is set.</p>
           </div>
         :snapInfo.count===0?
-          <div>
+          <div style={{textAlign:"center"}}>
             <p style={{margin:"0 0 8px",fontSize:14,fontWeight:500,color:th.text}}>No snapshots stored yet</p>
-            <p style={{margin:"0 0 4px",fontSize:12,color:th.textMuted,lineHeight:1.5}}>Daily snapshots begin after the next cron run (live Pipedrive data only). Period-over-period comparisons activate once at least 14 days have accumulated.</p>
+            <p style={{margin:"0 0 4px",fontSize:12,color:th.textMuted,lineHeight:1.5}}>Daily snapshots begin after the next cron run (live Pipedrive data only).</p>
             <p style={{margin:"12px 0 0",fontSize:11,color:th.textMuted}}>Current snapshot: {pd.totalActiveJobs} active jobs &middot; {pd.totalStuck} stuck &middot; end-to-end {pd.endToEndDays}d</p>
           </div>
         :<div>
-          <p style={{margin:"0 0 8px",fontSize:14,fontWeight:500,color:th.text}}>
-            {snapInfo.count} snapshot{snapInfo.count===1?"":"s"} stored
-            {snapInfo.count<14?" — "+(14-snapInfo.count)+" more until comparisons activate":""}
-          </p>
-          <p style={{margin:"0 0 4px",fontSize:12,color:th.textMuted}}>
-            Oldest: {snapInfo.oldest} &middot; Newest: {snapInfo.newest}
-          </p>
-          {snapInfo.count>=14?
-            <p style={{margin:"12px 0 0",fontSize:12,color:C.green}}>Comparison engine ready. Pick a range above.</p>
-          :<p style={{margin:"12px 0 0",fontSize:11,color:th.textMuted}}>Current snapshot: {pd.totalActiveJobs} active jobs &middot; {pd.totalStuck} stuck &middot; end-to-end {pd.endToEndDays}d</p>}
+          <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:8,marginBottom:14}}>
+            <div>
+              <p style={{margin:0,fontSize:13,fontWeight:500,color:th.text}}>{range}</p>
+              {compareInfo.currentDate&&compareInfo.baselineDate&&
+                <p style={{margin:"2px 0 0",fontSize:11,color:th.textMuted}}>{compareInfo.baselineDate} → {compareInfo.currentDate}</p>}
+            </div>
+            <p style={{margin:0,fontSize:11,color:th.textMuted}}>{snapInfo.count} snapshot{snapInfo.count===1?"":"s"} stored &middot; oldest {snapInfo.oldest}</p>
+          </div>
+          {compareInfo.loading?
+            <p style={{margin:0,fontSize:12,color:th.textMuted,textAlign:"center",padding:"1rem 0"}}>Computing diff…</p>
+          :compareInfo.error?
+            <p style={{margin:0,fontSize:12,color:C.red,textAlign:"center",padding:"1rem 0"}}>{compareInfo.error}</p>
+          :compareInfo.status==="ok"&&compareInfo.rows?
+            <div style={{display:"flex",flexDirection:"column",gap:6}}>
+              {compareInfo.rows.map(function(row){
+                var col=row.direction==="up"?C.green:row.direction==="down"?C.red:th.textMuted;
+                // For some KPIs "down" is good — invert colour
+                if(row.key==="lostLast30d"||row.key==="cancellationRate30d"||row.key==="activitiesOverdue"||row.key==="endToEndDays"){
+                  col=row.direction==="down"?C.green:row.direction==="up"?C.red:th.textMuted;
+                }
+                var sign=row.delta>0?"+":"";
+                return <div key={row.key} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:th.inputBg,borderRadius:8,border:"1px solid "+th.borderPlain}}>
+                  <span style={{flex:1,fontSize:13,color:th.text}}>{row.label}</span>
+                  <span style={{fontSize:12,color:th.textMuted,minWidth:90,textAlign:"right"}}>{fmtDiffValue(row.format,row.baseline)} → {fmtDiffValue(row.format,row.current)}</span>
+                  <span style={{fontSize:13,fontWeight:500,color:col,minWidth:80,textAlign:"right"}}>{sign}{fmtDiffValue(row.format,row.delta)}{row.pct!==null?" ("+sign+row.pct.toFixed(1)+"%)":""}</span>
+                </div>;
+              })}
+            </div>
+          :<div style={{textAlign:"center",padding:"1rem 0"}}>
+            <p style={{margin:"0 0 4px",fontSize:13,color:th.text}}>Not enough history yet</p>
+            <p style={{margin:0,fontSize:11,color:th.textMuted}}>{compareInfo.message||"More snapshots needed for this range."}</p>
+          </div>}
         </div>}
       </div>
     </div>}
@@ -839,13 +889,20 @@ function PushModal({draftChanges,team,onConfirm,onCancel,th}){
 
 // PD_FIELDS_FLAT imported from ../shared/domain
 
-function KpiMapping({kpiTags,setKpiTags,team,th,pd}){
+function KpiMapping({kpiTags,setKpiTags,team,th,pd,kpiCfgState,onSaveKpiConfig}){
   var [sel,setSel]=useState(kpiTags[0]?kpiTags[0].id:null);
   var [newName,setNewName]=useState("");var [testing,setTesting]=useState(null);var [cfmDel,setCfmDel]=useState(null);var [tagSearch,setTagSearch]=useState("");
   var tag=kpiTags.find(function(t){return t.id===sel;});
   var bNames=Object.keys(BOARDS);
   var iS={background:th.inputBg,border:"1px solid "+th.inputBorder,borderRadius:10,color:th.selectText,fontSize:13,padding:"8px 11px",outline:"none",fontFamily:"inherit",boxSizing:"border-box" as const};
   var filtered=useMemo(function(){return tagSearch?kpiTags.filter(function(t){return t.name.toLowerCase().indexOf(tagSearch.toLowerCase())>=0;}):kpiTags;},[kpiTags,tagSearch]);
+
+  // ── Save bar UI bits ──
+  var cfg=kpiCfgState||{status:"saved",source:"default",updatedAt:null,error:null};
+  var saveColor=cfg.status==="dirty"?C.orange:cfg.status==="saving"?C.blue:cfg.status==="error"?C.red:C.green;
+  var saveLabel=cfg.status==="dirty"?"Save changes":cfg.status==="saving"?"Saving...":cfg.status==="error"?"Retry save":cfg.status==="loading"?"Loading...":"Saved";
+  var sourceLabel=cfg.source==="blob"?"Persisted (cron will use these)":cfg.source==="default"?"Defaults (edits NOT yet saved)":"";
+  var updatedLabel=cfg.updatedAt?new Date(cfg.updatedAt).toLocaleString():null;
 
   function addSrc(){if(!sel)return;setKpiTags(function(ts){return ts.map(function(t){return t.id===sel?Object.assign({},t,{sources:t.sources.concat([{board:bNames[0],scope:"board",stage:null,field:"stage.deal_count"}])}):t;});});}
   function updSrc(tid,si,f,v){setKpiTags(function(ts){return ts.map(function(t){if(t.id!==tid)return t;var s=t.sources.map(function(src,i){if(i!==si)return src;var u=Object.assign({},src);u[f]=v;if(f==="board")u.stage=null;if(f==="scope"&&v==="board")u.stage=null;return u;});return Object.assign({},t,{sources:s});});});}
@@ -871,7 +928,24 @@ function KpiMapping({kpiTags,setKpiTags,team,th,pd}){
     },300);
   }
 
-  return <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+  return <div style={{display:"flex",flexDirection:"column",gap:10}}>
+    {/* Persistence bar — Cycle 6 */}
+    <div style={{background:th.card,border:"1px solid "+saveColor+"44",borderRadius:12,padding:"10px 14px",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+      <div style={{flex:1,minWidth:200}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{display:"inline-block",width:8,height:8,borderRadius:"50%",background:saveColor,boxShadow:"0 0 6px "+saveColor}}/>
+          <span style={{fontSize:13,fontWeight:500,color:th.text}}>{sourceLabel}</span>
+        </div>
+        {updatedLabel&&<p style={{margin:"2px 0 0 16px",fontSize:11,color:th.textMuted}}>Last saved: {updatedLabel}</p>}
+        {cfg.error&&<p style={{margin:"2px 0 0 16px",fontSize:11,color:C.red}}>{cfg.error}</p>}
+      </div>
+      <button
+        onClick={onSaveKpiConfig}
+        disabled={cfg.status==="saving"||cfg.status==="loading"||cfg.status==="saved"}
+        style={{background:saveColor+"22",border:"1px solid "+saveColor+"66",borderRadius:8,color:saveColor,fontWeight:500,fontSize:12,padding:"7px 14px",cursor:cfg.status==="saving"||cfg.status==="saved"?"default":"pointer",opacity:cfg.status==="saved"?0.6:1}}
+      >{saveLabel}</button>
+    </div>
+    <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
     <div style={{width:210,flexShrink:0}}>
       <div style={{background:th.card,border:"1px solid "+th.border,borderRadius:16,padding:"1rem"}}>
         <SLabel icon="ti-tag" text="Global KPI tags"/>
@@ -939,6 +1013,7 @@ function KpiMapping({kpiTags,setKpiTags,team,th,pd}){
         <button onClick={addSrc} style={{background:C.orange+"18",border:"1px solid "+C.orange+"44",borderRadius:10,color:C.orange,fontWeight:500,fontSize:11,padding:"6px 14px",cursor:"pointer",width:"100%"}}>+ Add data source</button>
       </div>:<div style={{background:th.card,border:"1px solid "+th.border,borderRadius:16,padding:"2rem",textAlign:"center"}}><p style={{color:th.textMuted,fontSize:13}}>Select a KPI tag to configure</p></div>}
     </div>
+    </div>
   </div>;
 }
 
@@ -965,6 +1040,11 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
   var [sendTime,setSendTime]=useState("06:00");
   var [team,setTeam]=useState(TEAM_INIT.map(function(m){return Object.assign({},m);}));
   var [kpiTags,setKpiTags]=useState(KPI_INIT);
+  // Persistence state for kpiTags config (Cycle 6).
+  // 'idle' = initial value before first load. 'loading' = fetch in flight.
+  // 'saved' = local matches blob. 'dirty' = local has unsaved edits.
+  // 'saving' = save in flight. 'error' = last load/save failed.
+  var [kpiCfgState,setKpiCfgState]=useState<{status:string;source:string;updatedAt:string|null;error:string|null}>({status:"idle",source:"default",updatedAt:null,error:null});
   var [audit,setAudit]=useState(AUDIT_INIT);
   var [ralph,setRalph]=useState(RALPH_INIT);
   var [showRalphForm,setShowRalphForm]=useState(false);
@@ -1087,6 +1167,60 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
     return function(){canceled=true;if(retryTimer)clearTimeout(retryTimer);};
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
+
+  // Load persisted KPI tag config on mount. Falls back to bundled
+  // KPI_INIT if blob is empty or fetch fails — UI shows source label
+  // so the user knows whether they're editing defaults or saved.
+  React.useEffect(function(){
+    var canceled=false;
+    async function load(){
+      setKpiCfgState(function(s){return Object.assign({},s,{status:"loading",error:null});});
+      try{
+        var r=await fetch("/api/config/kpi-tags");
+        if(!r.ok)throw new Error("HTTP "+r.status);
+        var j=await r.json();
+        if(canceled)return;
+        if(j&&j.success&&Array.isArray(j.tags)){
+          setKpiTags(j.tags);
+          setKpiCfgState({status:"saved",source:j.source||"default",updatedAt:j.updatedAt||null,error:null});
+        }else{
+          setKpiCfgState({status:"saved",source:"default",updatedAt:null,error:null});
+        }
+      }catch(err:any){
+        if(canceled)return;
+        setKpiCfgState({status:"error",source:"default",updatedAt:null,error:err.message||"load failed"});
+      }
+    }
+    load();
+    return function(){canceled=true;};
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
+
+  // Mark dirty whenever kpiTags changes AFTER initial load.
+  // We use a ref-like flag via the "status" check so the first hydration doesn't trigger.
+  var kpiTagsFirstRef=React.useRef(true);
+  React.useEffect(function(){
+    if(kpiTagsFirstRef.current){kpiTagsFirstRef.current=false;return;}
+    setKpiCfgState(function(s){if(s.status==="saving"||s.status==="loading")return s;return Object.assign({},s,{status:"dirty"});});
+  },[kpiTags]);
+
+  async function saveKpiConfig(){
+    setKpiCfgState(function(s){return Object.assign({},s,{status:"saving",error:null});});
+    try{
+      var r=await fetch("/api/config/kpi-tags",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({tags:kpiTags}),
+      });
+      var j=await r.json();
+      if(!r.ok||!j.success)throw new Error(j.error||("HTTP "+r.status));
+      setKpiCfgState({status:"saved",source:"blob",updatedAt:j.updatedAt||new Date().toISOString(),error:null});
+      addAudit("KPI tag config saved",kpiTags.length+" tags persisted to Blob","kpi");
+    }catch(err:any){
+      setKpiCfgState(function(s){return Object.assign({},s,{status:"error",error:err.message||"save failed"});});
+    }
+  }
+
 
   async function genAiSummary(){
     setSummaryLoading(true);
@@ -1381,7 +1515,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
         </div>
         <button onClick={function(){setSaved(true);addAudit("Configuration saved","General settings updated","system");setTimeout(function(){setSaved(false);},2000);}} style={{alignSelf:"flex-start",background:saved?C.green+"18":"linear-gradient(135deg,"+C.orange+","+C.orangeDeep+")",color:saved?C.green:"#fff",border:saved?"1px solid "+C.green:"none",borderRadius:12,padding:"10px 24px",fontSize:14,fontWeight:500,cursor:"pointer"}}>{saved?"Saved":"Save configuration"}</button>
       </div>}
-      {stab==="KPI Mapping"&&<KpiMapping kpiTags={kpiTags} setKpiTags={setKpiTags} team={team} th={th} pd={pd}/>}
+      {stab==="KPI Mapping"&&<KpiMapping kpiTags={kpiTags} setKpiTags={setKpiTags} team={team} th={th} pd={pd} kpiCfgState={kpiCfgState} onSaveKpiConfig={saveKpiConfig}/>}
       {stab==="Pipedrive Fields"&&<div>
         <p style={{fontSize:13,color:th.textMuted,margin:"0 0 1rem"}}>All available Pipedrive data points for KPI mapping.</p>
         <div style={{display:"flex",flexDirection:"column",gap:4}}>
