@@ -1,2 +1,2 @@
-export * from "./view";
-export * from "./resolver";
+export * from "./view.js";
+export * from "./resolver.js";

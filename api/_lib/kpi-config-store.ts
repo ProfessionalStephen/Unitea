@@ -13,8 +13,8 @@
 // ─────────────────────────────────────────────────────────────
 
 import { put, head } from "@vercel/blob";
-import type { KpiTag } from "../../shared/domain/types";
-import { KPI_INIT } from "../../shared/domain/kpi-configs";
+import type { KpiTag } from "../../shared/domain/types.js";
+import { KPI_INIT } from "../../shared/domain/kpi-configs.js";
 
 const PATHNAME = "config/kpi-tags.json";
 

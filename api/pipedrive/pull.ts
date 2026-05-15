@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { requireSession } from "../_lib/session";
-import { pullPipedrive } from "../_lib/pipedrive";
+import { requireSession } from "../_lib/session.js";
+import { pullPipedrive } from "../_lib/pipedrive.js";
 
 // ─────────────────────────────────────────────
 // Pipedrive proxy — read-only, server-side

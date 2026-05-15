@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { OAuth2Client } from "googleapis-common";
-import { requireSession } from "../_lib/session";
+import { requireSession } from "../_lib/session.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {

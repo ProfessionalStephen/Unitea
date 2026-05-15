@@ -12,8 +12,8 @@
 //   3. If role is new, add to RT in roles.ts first
 // ─────────────────────────────────────────────────────────────
 
-import type { TeamMember } from "./types";
-import { boardsForRole, kpisForRole } from "./roles";
+import type { TeamMember } from "./types.js";
+import { boardsForRole, kpisForRole } from "./roles.js";
 
 function member(
   partial: Omit<TeamMember, "boards" | "kpis">

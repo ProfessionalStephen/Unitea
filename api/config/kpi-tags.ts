@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { requireSession } from "../_lib/session";
-import { readKpiConfig, writeKpiConfig } from "../_lib/kpi-config-store";
+import { requireSession } from "../_lib/session.js";
+import { readKpiConfig, writeKpiConfig } from "../_lib/kpi-config-store.js";
 
 // ─────────────────────────────────────────────────────────────
 // KPI tag config endpoint

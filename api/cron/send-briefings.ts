@@ -1,15 +1,15 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { OAuth2Client } from "googleapis-common";
-import { writeSnapshot } from "../_lib/snapshot";
-import { pullPipedrive } from "../_lib/pipedrive";
-import { readKpiConfig } from "../_lib/kpi-config-store";
+import { writeSnapshot } from "../_lib/snapshot.js";
+import { pullPipedrive } from "../_lib/pipedrive.js";
+import { readKpiConfig } from "../_lib/kpi-config-store.js";
 import {
   emailedTeam,
   kpisForRole,
   type TeamMember,
   type KpiTag,
-} from "../../shared/domain";
-import { resolveKpi, viewFromCron } from "../../shared/kpi";
+} from "../../shared/domain.js";
+import { resolveKpi, viewFromCron } from "../../shared/kpi.js";
 
 // ─────────────────────────────────────────────────────────────
 // All domain data (TEAM, role→kpis map, KPI configs) imported

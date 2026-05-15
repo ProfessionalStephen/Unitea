@@ -10,8 +10,8 @@
 // Adding a permission: add to PERMISSIONS map; reference via canAccess()
 // ─────────────────────────────────────────────────────────────
 
-import type { RoleConfig, Permission } from "./types";
-import { BOARDS } from "./boards";
+import type { RoleConfig, Permission } from "./types.js";
+import { BOARDS } from "./boards.js";
 
 // Role badge color tokens — keep in sync with C constant in frontend
 const COLOR = {
