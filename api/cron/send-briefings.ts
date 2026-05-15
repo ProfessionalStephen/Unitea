@@ -8,8 +8,8 @@ import {
   kpisForRole,
   type TeamMember,
   type KpiTag,
-} from "../../shared/domain.js";
-import { resolveKpi, viewFromCron } from "../../shared/kpi.js";
+} from "../../shared/domain/index.js";
+import { resolveKpi, viewFromCron } from "../../shared/kpi/index.js";
 
 // ─────────────────────────────────────────────────────────────
 // All domain data (TEAM, role→kpis map, KPI configs) imported
