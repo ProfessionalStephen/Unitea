@@ -1,3 +1,4 @@
+﻿// @ts-nocheck
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import {
   BOARDS,
@@ -15,9 +16,9 @@ import {
 import { resolveKpi, viewFromFrontend } from "../shared/kpi";
 import { mapPullResponse } from "./data/pull-response";
 
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // THEME
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const DARK={bg:"#1A1C20",card:"rgba(46,49,56,0.9)",cardSolid:"#2E3138",border:"rgba(242,143,29,0.18)",borderPlain:"rgba(255,255,255,0.08)",text:"#F0F0F0",textMuted:"#897C80",inputBg:"rgba(255,255,255,0.06)",inputBorder:"rgba(242,143,29,0.25)",tabBg:"rgba(255,255,255,0.04)",tabBorder:"rgba(255,255,255,0.07)",selectText:"#F0F0F0",selectBg:"#2E3138"};
 const LIGHT={bg:"#F0F0F0",card:"rgba(232,232,232,0.95)",cardSolid:"#E8E8E8",border:"rgba(242,143,29,0.3)",borderPlain:"rgba(36,38,43,0.12)",text:"#24262B",textMuted:"#5A5A5A",inputBg:"rgba(36,38,43,0.06)",inputBorder:"rgba(242,143,29,0.4)",tabBg:"rgba(36,38,43,0.05)",tabBorder:"rgba(36,38,43,0.1)",selectText:"#24262B",selectBg:"#E8E8E8"};
 const C={orange:"#F28F1D",orangeDeep:"#D4721A",green:"#22C55E",amber:"#F59E0B",red:"#EF4444",blue:"#1D6FB5",purple:"#A855F7"};
@@ -26,8 +27,8 @@ const C={orange:"#F28F1D",orangeDeep:"#D4721A",green:"#22C55E",amber:"#F59E0B",r
 
 const RANGES=["Week over week","Month over month","Quarter over quarter","Year over year"];
 
-// ─────────────────────────────────────────────
-// DATA MODEL — derived view of pipelineData; domain constants imported from ../shared/domain
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// DATA MODEL â€” derived view of pipelineData; domain constants imported from ../shared/domain
 function buildPipelineData(liveApiData) {
   var boardNames=Object.keys(BOARDS);
   var boards={};
@@ -73,7 +74,7 @@ function buildPipelineData(liveApiData) {
 
     var boardAvgDays=boardTotalJobs>0?parseFloat((boardTotalDays/boardTotalJobs).toFixed(1)):0;
     var boardTotalValue=Object.values(stages).reduce(function(sum,s){return sum+(s.totalValue||0);},0);
-    // Status now derived from real stuck count vs total — not random
+    // Status now derived from real stuck count vs total â€” not random
     var stuckRatio=boardTotalJobs>0?boardStuck/boardTotalJobs:0;
     var status=stuckRatio>=0.2?"red":stuckRatio>=0.05?"amber":"green";
     totalActiveJobs+=boardTotalJobs;
@@ -129,7 +130,7 @@ function buildPipelineData(liveApiData) {
     repStats:repStats,
     allDeals:allDeals,
     isLive:!!liveApiData,
-    // Live aggregates (undefined when no live data — resolver falls back)
+    // Live aggregates (undefined when no live data â€” resolver falls back)
     totalPipelineValue:live.totalPipelineValue,
     wonThisWeek:live.wonThisWeek,
     wonThisWeekValue:live.wonThisWeekValue,
@@ -158,9 +159,9 @@ const RALPH_STAGES=[
   {stage:"H - Hardened",desc:"Stress-tested and permanently locked in",col:C.green},
 ];
 
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // PIPEDRIVE FETCH
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function valKey(k){if(!k||k.length<20)return "Key too short";if(!/^[a-f0-9]+$/i.test(k))return "Invalid characters";return null;}
 async function fetchPD(_apiKey,setErr,setHealth){
   setErr(null);
@@ -173,27 +174,27 @@ async function fetchPD(_apiKey,setErr,setHealth){
   }catch(err:any){setErr("Request failed: "+err.message);setHealth(function(h){return Object.assign({},h,{pd:"request failed"});});return null;}
 }
 
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // EMAIL TEMPLATE ENGINE
-// Fixed structure — AI fills content only
-// ─────────────────────────────────────────────
+// Fixed structure â€” AI fills content only
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 
-// ─────────────────────────────────────────────
-// KPI VALUE RESOLVER — delegates to shared/kpi/resolver
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// KPI VALUE RESOLVER â€” delegates to shared/kpi/resolver
 // Wraps adapter call + resolver for code-site convenience.
 // One source of truth shared with cron (api/cron/send-briefings.ts).
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function resolveKpiValue(tag, pd) {
-  if (!tag) return "—";
+  if (!tag) return "â€”";
   return resolveKpi(tag.name, tag, viewFromFrontend(pd));
 }
 
-// Build KPI table HTML from pipelineData — no AI, guaranteed layout
+// Build KPI table HTML from pipelineData â€” no AI, guaranteed layout
 function buildKpiTableHtml(person, pd, kpiTags, _liveApiData) {
   var kpis = person.kpis.map(function(k) {
     var tag = kpiTags.find(function(t) { return t.name === k; });
-    var val = tag ? resolveKpiValue(tag, pd) : "—";
+    var val = tag ? resolveKpiValue(tag, pd) : "â€”";
     return {name: k, val: val};
   });
 
@@ -231,7 +232,7 @@ function buildNeedsAttentionHtml(alerts, pd) {
   return rows;
 }
 
-// Master template assembler — fixed structure, no variation
+// Master template assembler â€” fixed structure, no variation
 function assembleEmail(person, content, kpiTableHtml, needsAttentionHtml, boardHealthHtml, isMonday, isOwnerLevel) {
   var divider = "<div style='height:1px;background:rgba(255,255,255,0.08);margin:0;'></div>";
   var sectionStyle = "padding:18px 22px;background:#24262B;";
@@ -239,14 +240,14 @@ function assembleEmail(person, content, kpiTableHtml, needsAttentionHtml, boardH
   var bodyStyle = "font-size:13px;color:#F0F0F0;font-family:Arial,sans-serif;line-height:1.6;";
 
   var sections = [
-    // S1 — Greeting
+    // S1 â€” Greeting
     "<div style='" + sectionStyle + "background:#1E2228;'>"
     + "<p style='" + bodyStyle + "margin:0;'>" + (content.greeting || "") + "</p>"
     + "</div>",
 
     divider,
 
-    // S2 — KPIs (built entirely from data, no AI)
+    // S2 â€” KPIs (built entirely from data, no AI)
     "<div style='" + sectionStyle + "'>"
     + "<p style='" + headerStyle + "'>Your KPIs today</p>"
     + kpiTableHtml
@@ -254,7 +255,7 @@ function assembleEmail(person, content, kpiTableHtml, needsAttentionHtml, boardH
 
     divider,
 
-    // S3 — Needs attention (AI text + code-built links)
+    // S3 â€” Needs attention (AI text + code-built links)
     "<div style='" + sectionStyle + "background:#1E2228;'>"
     + "<p style='" + headerStyle + "'>Needs attention</p>"
     + needsAttentionHtml
@@ -262,11 +263,11 @@ function assembleEmail(person, content, kpiTableHtml, needsAttentionHtml, boardH
 
     divider,
 
-    // S4 — Board health (built entirely from pipelineData, always here, always standalone)
+    // S4 â€” Board health (built entirely from pipelineData, always here, always standalone)
     person.nested ? boardHealthHtml : null,
     person.nested ? divider : null,
 
-    // S5 — Today's priorities (AI text)
+    // S5 â€” Today's priorities (AI text)
     "<div style='" + sectionStyle + "'>"
     + "<p style='" + headerStyle + "'>Today's priorities</p>"
     + (content.priorities || []).map(function(p, i) {
@@ -277,7 +278,7 @@ function assembleEmail(person, content, kpiTableHtml, needsAttentionHtml, boardH
       }).join("")
     + "</div>",
 
-    // S6 — Team pulse (owners only)
+    // S6 â€” Team pulse (owners only)
     isOwnerLevel && content.teamPulse ? divider : null,
     isOwnerLevel && content.teamPulse
       ? "<div style='" + sectionStyle + "background:#1E2228;'>"
@@ -286,7 +287,7 @@ function assembleEmail(person, content, kpiTableHtml, needsAttentionHtml, boardH
         + "</div>"
       : null,
 
-    // S7 — Week in review (Mondays)
+    // S7 â€” Week in review (Mondays)
     isMonday && content.weekReview ? divider : null,
     isMonday && content.weekReview
       ? "<div style='" + sectionStyle + "'>"
@@ -297,7 +298,7 @@ function assembleEmail(person, content, kpiTableHtml, needsAttentionHtml, boardH
 
     divider,
 
-    // Footer — hardcoded
+    // Footer â€” hardcoded
     "<div style='padding:14px 22px;background:#141618;text-align:center;'>"
     + "<p style='margin:0 0 6px;font-size:11px;color:#897C80;font-family:Arial,sans-serif;'>"
     + "<a href='mailto:ai@unicitysolar.com?subject=Snooze alert - " + person.name + "' style='color:#897C80;margin:0 8px;'>Snooze alerts</a>"
@@ -319,7 +320,7 @@ function escHtml(s){
   return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 }
 
-// Role-aware default priorities. Deterministic — no AI needed.
+// Role-aware default priorities. Deterministic â€” no AI needed.
 function getPriorities(person,pd){
   var stuck=pd.totalStuck||0;
   var role=(person.role||"").toLowerCase();
@@ -345,7 +346,7 @@ function getPriorities(person,pd){
 }
 
 // Build standalone board health block injected into preview emails for nested-access roles.
-// Uses pipelineData directly — no AI.
+// Uses pipelineData directly â€” no AI.
 function buildEmailHealthSection(pd, memberBoards) {
   var boards=(memberBoards||[]).filter(function(b){return pd.boards[b];});
   var sorted=boards.slice().sort(function(a,b){var o={red:0,amber:1,green:2};var sa=pd.boards[a]?pd.boards[a].status:"green";var sb=pd.boards[b]?pd.boards[b].status:"green";return(o[sa]||2)-(o[sb]||2);});
@@ -397,16 +398,16 @@ function buildEmailHealthSection(pd, memberBoards) {
     +"</div>";
 }
 
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // DOWNLOAD HELPERS
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function dlCSV(data,fn){if(!data.length)return;var k=Object.keys(data[0]);var csv=[k.join(",")].concat(data.map(function(r){return k.map(function(key){return '"'+(String(r[key]||"")).replace(/"/g,'""')+'"';}).join(",");})).join("\n");var a=document.createElement("a");a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(csv);a.download=fn;a.click();}
 function dlJSON(data,fn){var a=document.createElement("a");a.href="data:application/json;charset=utf-8,"+encodeURIComponent(JSON.stringify(data,null,2));a.download=fn;a.click();}
 function todayStr(){return new Date().toISOString().split("T")[0];}
 
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // UI ATOMS
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function UniLogo(){return <img src="/Unicity_Solar_Logo_only.png" alt="Unicity Solar" width="42" height="42" style={{display:"block"}}/>;}
 function Avatar({name,size=36}){var ini=name.split(" ").map(function(w){return w[0];}).join("").slice(0,2).toUpperCase();var bg=name.charCodeAt(0)%2===0?C.orange:C.blue;return <div style={{width:size,height:size,borderRadius:"50%",background:bg,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:500,fontSize:size*0.33,flexShrink:0,border:"2px solid "+bg+"44"}}>{ini}</div>;}
 function Pill({text,color="orange",size=11}){var fg=color==="green"?C.green:color==="red"?C.red:color==="amber"?C.amber:color==="blue"?C.blue:color==="purple"?C.purple:C.orange;return <span style={{background:fg+"18",color:fg,border:"1px solid "+fg+"44",fontSize:size,fontWeight:500,padding:"3px 8px",borderRadius:20,whiteSpace:"nowrap"}}>{text}</span>;}
@@ -415,16 +416,16 @@ function SubTab({tabs,active,onChange,th}){return <div style={{display:"flex",ga
 function SDot({on}){return <span style={{display:"inline-block",width:8,height:8,borderRadius:"50%",background:on?C.green:C.orange,boxShadow:on?"0 0 6px "+C.green:"0 0 6px "+C.orange,marginRight:6}}/>;}
 function RBadge({role}){var t=RT[role];var fg=t?t.color:"#897C80";return <span style={{background:fg+"18",color:fg,border:"1px solid "+fg+"44",fontSize:11,fontWeight:500,padding:"2px 8px",borderRadius:20,whiteSpace:"nowrap"}}>{role}</span>;}
 
-// Compact pill version of the cron status — sits in the header
+// Compact pill version of the cron status â€” sits in the header
 function CronStatusPill({status}){
-  if(status.loading)return <div style={{display:"flex",alignItems:"center",gap:5,background:"#6B626622",border:"1px solid #6B626644",borderRadius:20,padding:"5px 12px"}}><span style={{color:"#897C80",fontSize:10}}>●</span><span style={{fontSize:11,color:"#897C80"}}>Checking...</span></div>;
+  if(status.loading)return <div style={{display:"flex",alignItems:"center",gap:5,background:"#6B626622",border:"1px solid #6B626644",borderRadius:20,padding:"5px 12px"}}><span style={{color:"#897C80",fontSize:10}}>â—</span><span style={{fontSize:11,color:"#897C80"}}>Checking...</span></div>;
   var mode=status.mode||"unknown";
   var clr=mode==="live"?C.green:mode==="test"?C.amber:mode==="paused"?C.red:"#897C80";
   var label=mode==="live"?"Emails LIVE":mode==="test"?"TEST MODE":mode==="paused"?"PAUSED":"Status unknown";
-  return <div title={status.reason||""} style={{display:"flex",alignItems:"center",gap:5,background:clr+"18",border:"1px solid "+clr+"44",borderRadius:20,padding:"5px 12px"}}><span style={{color:clr,fontSize:10}}>●</span><span style={{fontSize:11,color:clr,fontWeight:500}}>{label}</span></div>;
+  return <div title={status.reason||""} style={{display:"flex",alignItems:"center",gap:5,background:clr+"18",border:"1px solid "+clr+"44",borderRadius:20,padding:"5px 12px"}}><span style={{color:clr,fontSize:10}}>â—</span><span style={{fontSize:11,color:clr,fontWeight:500}}>{label}</span></div>;
 }
 
-// Full-width banner — recipient list, next run, control hints
+// Full-width banner â€” recipient list, next run, control hints
 function CronStatusBanner({status,th}){
   if(status.loading)return null;
   if(status.error)return <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:"1rem",padding:"10px 16px",borderRadius:12,background:C.red+"10",border:"1px solid "+C.red+"44"}}>
@@ -433,7 +434,7 @@ function CronStatusBanner({status,th}){
   </div>;
   var mode=status.mode||"unknown";
   var clr=mode==="live"?C.green:mode==="test"?C.amber:mode==="paused"?C.red:"#897C80";
-  var headline=mode==="live"?"Briefings sending live — "+status.recipientCount+" recipients":mode==="test"?"TEST MODE — single recipient only":mode==="paused"?"Briefings PAUSED — no emails will send":"Status unknown";
+  var headline=mode==="live"?"Briefings sending live â€” "+status.recipientCount+" recipients":mode==="test"?"TEST MODE â€” single recipient only":mode==="paused"?"Briefings PAUSED â€” no emails will send":"Status unknown";
   var recipientLine=status.recipients&&status.recipients.length>0
     ?status.recipients.map(function(r){return r.name;}).join(", ")
     :(mode==="paused"?"Nothing scheduled":"No recipients configured");
@@ -443,24 +444,24 @@ function CronStatusBanner({status,th}){
       <div style={{flex:1,minWidth:260}}>
         <p style={{margin:0,fontSize:14,fontWeight:600,color:clr}}>{headline}</p>
         <p style={{margin:"3px 0 0",fontSize:11,color:th.textMuted,lineHeight:1.5}}>
-          Next run: <span style={{color:th.text}}>{status.nextRunLabel||"unknown"}</span> · {status.cronScheduleUtc||""}
-          {status.reason?" · "+status.reason:""}
+          Next run: <span style={{color:th.text}}>{status.nextRunLabel||"unknown"}</span> Â· {status.cronScheduleUtc||""}
+          {status.reason?" Â· "+status.reason:""}
         </p>
         <p style={{margin:"3px 0 0",fontSize:11,color:th.textMuted,lineHeight:1.5}}>
           Recipients: <span style={{color:th.text}}>{recipientLine}</span>
         </p>
       </div>
       <div style={{fontSize:10,color:th.textMuted,maxWidth:280,lineHeight:1.4}}>
-        Controls live in Vercel Settings → Environment Variables.
-        <br/><code style={{color:clr}}>EMAILS_PAUSED=true</code> to pause · <code style={{color:clr}}>CRON_TEST_RECIPIENT=&lt;email&gt;</code> for solo test
+        Controls live in Vercel Settings â†’ Environment Variables.
+        <br/><code style={{color:clr}}>EMAILS_PAUSED=true</code> to pause Â· <code style={{color:clr}}>CRON_TEST_RECIPIENT=&lt;email&gt;</code> for solo test
       </div>
     </div>
   </div>;
 }
 
-// ─────────────────────────────────────────────
-// DEAL CARD — reused across all drill-downs
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// DEAL CARD â€” reused across all drill-downs
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function DealCard({deal,threshold,th}){
   var [open,setOpen]=useState(false);
   var over=threshold&&deal.days>threshold;
@@ -487,11 +488,11 @@ function DealCard({deal,threshold,th}){
   </div>;
 }
 
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // KPI DRILL-DOWN PANEL
 // Opens when a KPI value is clicked
 // Derives all data from pipelineData
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function KpiDrillDown({kpiName,pd,memberBoards,role,onClose,th,onNavigateIntelligence}){
   var [expBoard,setExpBoard]=useState(null);
   var [expStage,setExpStage]=useState(null);
@@ -571,11 +572,11 @@ function KpiDrillDown({kpiName,pd,memberBoards,role,onClose,th,onNavigateIntelli
   </div>;
 }
 
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // INTELLIGENCE TAB
 // 4 sub-tabs: Overview, Pipeline Speed, Bottlenecks, History
 // All powered by pipelineData
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summaryLoading,activeSubTab,onSubTabChange}){
   var [internalSub,setInternalSub]=useState("Overview");
   var sub=activeSubTab||internalSub;
@@ -585,7 +586,7 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
   var memberBoards=(member.boards||[]).filter(function(b){return pd.boards[b];});
   var showRepData=canAccess(role,"repData");
 
-  // Snapshot accumulation state — fetched lazily when History sub-tab opens
+  // Snapshot accumulation state â€” fetched lazily when History sub-tab opens
   var [snapInfo,setSnapInfo]=useState({loading:false,loaded:false,count:0,oldest:null,newest:null,error:null});
   useEffect(function(){
     if(sub!=="History"||snapInfo.loaded||snapInfo.loading)return;
@@ -596,7 +597,7 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
       .catch(function(e){setSnapInfo({loading:false,loaded:true,count:0,oldest:null,newest:null,error:e.message||"fetch failed"});});
   },[sub,snapInfo.loaded,snapInfo.loading]);
 
-  // Range comparison — Cycle 7. Fires whenever the user picks a range pill
+  // Range comparison â€” Cycle 7. Fires whenever the user picks a range pill
   // on the History tab. Diffs current snapshot against the closest snapshot
   // on or before the range's baseline date. Server-side: api/snapshots/compare.
   var [compareInfo,setCompareInfo]=useState<{loading:boolean;status:string|null;rows:any[]|null;currentDate:string|null;baselineDate:string|null;message:string|null;error:string|null}>({loading:false,status:null,rows:null,currentDate:null,baselineDate:null,message:null,error:null});
@@ -630,7 +631,7 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
     return String(n);
   }
 
-  // Heat map colour: green→amber→red based on avgDays vs threshold (or fallback)
+  // Heat map colour: greenâ†’amberâ†’red based on avgDays vs threshold (or fallback)
   function heatColor(avgDays,threshold){
     var ref=threshold||7;
     var ratio=avgDays/ref;
@@ -652,7 +653,7 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
           {l:"Active jobs",v:pd.totalActiveJobs,col:C.orange,tip:"All open deals across every Pipedrive pipeline. Pulled live when you click 'Pull live data'."},
           {l:"Stuck jobs",v:pd.totalStuck,col:C.red,tip:"Deals in stages where the average days-in-stage is over 30% above that board's overall average. Indicates bottleneck pressure, not individual deal age."},
           {l:"End-to-end avg",v:pd.endToEndDays+"d",col:C.blue,tip:"Sum of average days-in-stage across all your boards. Approximates total pipeline time from first stage to install."},
-          {l:"Industry bench",v:INDUSTRY_BENCHMARK_DAYS+"d",col:th.textMuted,tip:"Industry average end-to-end pipeline time. For comparison only — your number above is what matters."}
+          {l:"Industry bench",v:INDUSTRY_BENCHMARK_DAYS+"d",col:th.textMuted,tip:"Industry average end-to-end pipeline time. For comparison only â€” your number above is what matters."}
         ].map(function(s){
           return <div key={s.l} title={s.tip} style={{background:s.col+"0d",border:"1px solid "+s.col+"22",borderRadius:10,padding:"10px 12px",textAlign:"center",cursor:"help"}}>
             <p style={{margin:0,fontSize:20,fontWeight:500,color:s.col}}>{s.v}</p>
@@ -662,7 +663,7 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
       </div>
 
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:"1rem"}}>
-        {[["green","Healthy","●"],["amber","Watch","▲"],["red","Critical","x"]].map(function(arr){
+        {[["green","Healthy","â—"],["amber","Watch","â–²"],["red","Critical","x"]].map(function(arr){
           var s=arr[0];var label=arr[1];var icon=arr[2];
           var col=s==="green"?C.green:s==="amber"?C.amber:C.red;
           var count=memberBoards.filter(function(b){return pd.boards[b]&&pd.boards[b].status===s;}).length;
@@ -756,7 +757,7 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
             <span style={{fontSize:11,color:C.red,background:C.red+"18",padding:"2px 7px",borderRadius:8,fontWeight:500}}>{bn.stuckCount} deals</span>
           </div>;
         })}
-        {pd.bottlenecks.length===0&&<p style={{margin:0,fontSize:13,color:C.green}}>✓ No significant bottlenecks detected. All stages within 50% of their board average.</p>}
+        {pd.bottlenecks.length===0&&<p style={{margin:0,fontSize:13,color:C.green}}>âœ“ No significant bottlenecks detected. All stages within 50% of their board average.</p>}
       </div>
 
       {showRepData&&<div>
@@ -782,7 +783,7 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
         {RANGES.map(function(r){return <button key={r} onClick={function(){setRange(r);}} style={{padding:"6px 12px",border:"1px solid "+(range===r?C.orange:th.borderPlain),borderRadius:20,background:range===r?C.orange+"18":th.inputBg,color:range===r?C.orange:th.textMuted,fontSize:11,cursor:"pointer",fontWeight:range===r?500:400}}>{r}</button>;})}</div>
       <div style={{background:th.card,border:"1px solid "+th.border,borderRadius:12,padding:"1.25rem 1.5rem"}}>
         {snapInfo.loading?
-          <p style={{margin:0,fontSize:13,color:th.textMuted,textAlign:"center"}}>Loading snapshot index…</p>
+          <p style={{margin:0,fontSize:13,color:th.textMuted,textAlign:"center"}}>Loading snapshot indexâ€¦</p>
         :snapInfo.error?
           <div style={{textAlign:"center"}}>
             <p style={{margin:"0 0 6px",fontSize:14,fontWeight:500,color:C.red}}>Snapshot store unavailable</p>
@@ -799,26 +800,26 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
             <div>
               <p style={{margin:0,fontSize:13,fontWeight:500,color:th.text}}>{range}</p>
               {compareInfo.currentDate&&compareInfo.baselineDate&&
-                <p style={{margin:"2px 0 0",fontSize:11,color:th.textMuted}}>{compareInfo.baselineDate} → {compareInfo.currentDate}</p>}
+                <p style={{margin:"2px 0 0",fontSize:11,color:th.textMuted}}>{compareInfo.baselineDate} â†’ {compareInfo.currentDate}</p>}
             </div>
             <p style={{margin:0,fontSize:11,color:th.textMuted}}>{snapInfo.count} snapshot{snapInfo.count===1?"":"s"} stored &middot; oldest {snapInfo.oldest}</p>
           </div>
           {compareInfo.loading?
-            <p style={{margin:0,fontSize:12,color:th.textMuted,textAlign:"center",padding:"1rem 0"}}>Computing diff…</p>
+            <p style={{margin:0,fontSize:12,color:th.textMuted,textAlign:"center",padding:"1rem 0"}}>Computing diffâ€¦</p>
           :compareInfo.error?
             <p style={{margin:0,fontSize:12,color:C.red,textAlign:"center",padding:"1rem 0"}}>{compareInfo.error}</p>
           :compareInfo.status==="ok"&&compareInfo.rows?
             <div style={{display:"flex",flexDirection:"column",gap:6}}>
               {compareInfo.rows.map(function(row){
                 var col=row.direction==="up"?C.green:row.direction==="down"?C.red:th.textMuted;
-                // For some KPIs "down" is good — invert colour
+                // For some KPIs "down" is good â€” invert colour
                 if(row.key==="lostLast30d"||row.key==="cancellationRate30d"||row.key==="activitiesOverdue"||row.key==="endToEndDays"){
                   col=row.direction==="down"?C.green:row.direction==="up"?C.red:th.textMuted;
                 }
                 var sign=row.delta>0?"+":"";
                 return <div key={row.key} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 10px",background:th.inputBg,borderRadius:8,border:"1px solid "+th.borderPlain}}>
                   <span style={{flex:1,fontSize:13,color:th.text}}>{row.label}</span>
-                  <span style={{fontSize:12,color:th.textMuted,minWidth:90,textAlign:"right"}}>{fmtDiffValue(row.format,row.baseline)} → {fmtDiffValue(row.format,row.current)}</span>
+                  <span style={{fontSize:12,color:th.textMuted,minWidth:90,textAlign:"right"}}>{fmtDiffValue(row.format,row.baseline)} â†’ {fmtDiffValue(row.format,row.current)}</span>
                   <span style={{fontSize:13,fontWeight:500,color:col,minWidth:80,textAlign:"right"}}>{sign}{fmtDiffValue(row.format,row.delta)}{row.pct!==null?" ("+sign+row.pct.toFixed(1)+"%)":""}</span>
                 </div>;
               })}
@@ -833,9 +834,9 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
   </div>;
 }
 
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // MODALS
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function BoardModal({member,allBoards,onSave,onClose,th}){
   var [sel,setSel]=useState(new Set(member.boards));
   var toggle=function(b){setSel(function(s){var n=new Set(s);n.has(b)?n.delete(b):n.add(b);return n;});};
@@ -897,7 +898,7 @@ function KpiMapping({kpiTags,setKpiTags,team,th,pd,kpiCfgState,onSaveKpiConfig})
   var iS={background:th.inputBg,border:"1px solid "+th.inputBorder,borderRadius:10,color:th.selectText,fontSize:13,padding:"8px 11px",outline:"none",fontFamily:"inherit",boxSizing:"border-box" as const};
   var filtered=useMemo(function(){return tagSearch?kpiTags.filter(function(t){return t.name.toLowerCase().indexOf(tagSearch.toLowerCase())>=0;}):kpiTags;},[kpiTags,tagSearch]);
 
-  // ── Save bar UI bits ──
+  // â”€â”€ Save bar UI bits â”€â”€
   var cfg=kpiCfgState||{status:"saved",source:"default",updatedAt:null,error:null};
   var saveColor=cfg.status==="dirty"?C.orange:cfg.status==="saving"?C.blue:cfg.status==="error"?C.red:C.green;
   var saveLabel=cfg.status==="dirty"?"Save changes":cfg.status==="saving"?"Saving...":cfg.status==="error"?"Retry save":cfg.status==="loading"?"Loading...":"Saved";
@@ -916,10 +917,10 @@ function KpiMapping({kpiTags,setKpiTags,team,th,pd,kpiCfgState,onSaveKpiConfig})
       setKpiTags(function(ts){return ts.map(function(t){
         if(t.id!==tid)return t;
         var result;
-        if(!pd){result="No data — pull Pipedrive first";}
+        if(!pd){result="No data â€” pull Pipedrive first";}
         else{
           var val=resolveKpiValue(t,pd);
-          var liveLabel=pd.isLive?"":" (no live data — fallback)";
+          var liveLabel=pd.isLive?"":" (no live data â€” fallback)";
           result=val+liveLabel;
         }
         return Object.assign({},t,{testResult:result});
@@ -929,7 +930,7 @@ function KpiMapping({kpiTags,setKpiTags,team,th,pd,kpiCfgState,onSaveKpiConfig})
   }
 
   return <div style={{display:"flex",flexDirection:"column",gap:10}}>
-    {/* Persistence bar — Cycle 6 */}
+    {/* Persistence bar â€” Cycle 6 */}
     <div style={{background:th.card,border:"1px solid "+saveColor+"44",borderRadius:12,padding:"10px 14px",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
       <div style={{flex:1,minWidth:200}}>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
@@ -981,7 +982,7 @@ function KpiMapping({kpiTags,setKpiTags,team,th,pd,kpiCfgState,onSaveKpiConfig})
         <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
           <span style={{fontSize:11,color:th.textMuted}}>Fallback:</span>
           <select value={tag.fallback} onChange={function(e){setKpiTags(function(ts){return ts.map(function(t){return t.id===tag.id?Object.assign({},t,{fallback:e.target.value}):t;});});}} style={Object.assign({},iS,{padding:"4px 8px",fontSize:11,width:"auto",color:th.selectText,background:th.selectBg})}>
-            {["N/A","0","—","No data","Use last known value"].map(function(o){return <option key={o} style={{background:th.selectBg,color:th.selectText}}>{o}</option>;})}
+            {["N/A","0","â€”","No data","Use last known value"].map(function(o){return <option key={o} style={{background:th.selectBg,color:th.selectText}}>{o}</option>;})}
           </select>
         </div>
         <p style={{fontSize:11,color:th.textMuted,margin:"0 0 6px"}}>Data sources ({tag.sources.length})</p>
@@ -1017,9 +1018,9 @@ function KpiMapping({kpiTags,setKpiTags,team,th,pd,kpiCfgState,onSaveKpiConfig})
   </div>;
 }
 
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // MAIN APP
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string}}){
   var [dark,setDark]=useState(true);
   var th=dark?DARK:LIGHT;
@@ -1061,7 +1062,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
   // Data layer state
   var [liveApiData,setLiveApiData]=useState(null);
   // staleCache: if non-null, we're displaying data from localStorage because the live fetch failed.
-  // Shape: { ts: number } — when the cached data was originally fetched.
+  // Shape: { ts: number } â€” when the cached data was originally fetched.
   var [staleCache,setStaleCache]=useState<{ts:number}|null>(null);
   var [liveLoad,setLiveLoad]=useState(false);
   var [apiHealth,setApiHealth]=useState({pd:"unknown",gmail:"unknown",lastPull:"Never"});
@@ -1076,7 +1077,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
   // KPI drill-down state
   var [kpiDrillKpi,setKpiDrillKpi]=useState(null);
 
-  // Cron status state — fetched from /api/cron/status. Refreshed every 30s.
+  // Cron status state â€” fetched from /api/cron/status. Refreshed every 30s.
   var [cronStatus,setCronStatus]=useState({loading:true,mode:"unknown",error:null});
   useEffect(function(){
     var cancelled=false;
@@ -1091,7 +1092,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
     return function(){cancelled=true;clearInterval(id);};
   },[]);
 
-  // Single derived pipelineData — everything in the app reads from this
+  // Single derived pipelineData â€” everything in the app reads from this
   var pd=useMemo(function(){return buildPipelineData(liveApiData);},[liveApiData]);
 
   var allBoards=Object.keys(BOARDS);
@@ -1113,7 +1114,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
       try{window.localStorage.setItem("pipedrive:lastPull",JSON.stringify({data:d,ts:Date.now()}));}catch(e){}
       addAudit(isAuto?"Live Pipedrive data auto-pulled":"Live Pipedrive data pulled",d.totalDeals+" open deals fetched","system");
     } else if(isAuto){
-      // Auto-pull failed — try to use localStorage cache
+      // Auto-pull failed â€” try to use localStorage cache
       try{
         var raw=window.localStorage.getItem("pipedrive:lastPull");
         if(raw){
@@ -1169,7 +1170,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
   },[]);
 
   // Load persisted KPI tag config on mount. Falls back to bundled
-  // KPI_INIT if blob is empty or fetch fails — UI shows source label
+  // KPI_INIT if blob is empty or fetch fails â€” UI shows source label
   // so the user knows whether they're editing defaults or saved.
   React.useEffect(function(){
     var canceled=false;
@@ -1231,7 +1232,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
     }else{
       lines.push("Top "+top3.length+" bottleneck"+(top3.length>1?"s":"")+" across the pipeline:");
       top3.forEach(function(b,i){
-        lines.push((i+1)+". "+b.board+" › "+b.stage+" — "+b.stuckCount+" stuck deals, "+b.pctAbove+"% above average.");
+        lines.push((i+1)+". "+b.board+" â€º "+b.stage+" â€” "+b.stuckCount+" stuck deals, "+b.pctAbove+"% above average.");
       });
       lines.push("");
       lines.push("Recommended focus: review the highest-percentage bottleneck with the owning team and identify whether the constraint is process, capacity, or external dependency.");
@@ -1240,7 +1241,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
     setSummaryLoading(false);
   }
 
-  // Generate preview email — fully deterministic, no AI. Built from pipelineData and person.
+  // Generate preview email â€” fully deterministic, no AI. Built from pipelineData and person.
   async function genPreview(person,idx){
     setPrevLoad(true);setPrevEmail(null);
     try{
@@ -1250,23 +1251,23 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
       var isOwner=canAccess(person.role,"analyticsDeep");
       var firstName=person.name.split(" ")[0];
 
-      // ── KPI value resolver: live data when mapped, fallback otherwise ──
+      // â”€â”€ KPI value resolver: live data when mapped, fallback otherwise â”€â”€
       function resolveKpi(kpiName){
         var tag=kpiTags.find(function(t){return t.name===kpiName;});
-        if(!tag||!tag.sources||tag.sources.length===0)return tag&&tag.fallback?tag.fallback:"—";
-        if(!liveApiData||!liveApiData.boardData)return tag.fallback||"—";
+        if(!tag||!tag.sources||tag.sources.length===0)return tag&&tag.fallback?tag.fallback:"â€”";
+        if(!liveApiData||!liveApiData.boardData)return tag.fallback||"â€”";
         var src=tag.sources[0];
         var bd=liveApiData.boardData[src.board];
-        if(!bd)return tag.fallback||"—";
+        if(!bd)return tag.fallback||"â€”";
         if(src.scope==="board")return String(bd.totalDeals);
         if(src.scope==="stage"&&src.stage){
           var st=bd.stages&&bd.stages.find(function(s){return s.name&&s.name.toLowerCase()===src.stage.toLowerCase();});
-          return st?String(st.count):(tag.fallback||"—");
+          return st?String(st.count):(tag.fallback||"â€”");
         }
-        return tag.fallback||"—";
+        return tag.fallback||"â€”";
       }
 
-      // ── Build KPI table (3 cols, fills with empty cells for odd counts) ──
+      // â”€â”€ Build KPI table (3 cols, fills with empty cells for odd counts) â”€â”€
       var kpiCells=person.kpis.map(function(k){
         var v=resolveKpi(k);
         return "<td style='padding:10px 8px;vertical-align:top;width:33%;'><div style='font-size:11px;color:#897C80;margin-bottom:3px;'>"+escHtml(k)+"</div><div style='font-size:18px;color:#F0F0F0;font-weight:600;'>"+escHtml(v)+"</div></td>";
@@ -1277,28 +1278,28 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
         kpiRows+="<tr>"+kpiCells[ri]+kpiCells[ri+1]+kpiCells[ri+2]+"</tr>";
       }
 
-      // ── Bottlenecks (top 3 relevant to this person's boards) ──
+      // â”€â”€ Bottlenecks (top 3 relevant to this person's boards) â”€â”€
       var personBoards=person.boards==="all"?Object.keys(BOARDS):(Array.isArray(person.boards)?person.boards:[]);
       var bottlenecks=(pd.bottlenecks||[]).filter(function(b){return personBoards.indexOf(b.board)>=0;}).slice(0,3);
       var bottleneckHtml=bottlenecks.length===0
-        ? "<p style='margin:0;font-size:13px;color:#22C55E;'>No bottlenecks detected in your boards. ✓</p>"
+        ? "<p style='margin:0;font-size:13px;color:#22C55E;'>No bottlenecks detected in your boards. âœ“</p>"
         : bottlenecks.map(function(b){
             return "<div style='margin-bottom:8px;padding:8px 10px;background:rgba(239,68,68,0.08);border-left:3px solid #EF4444;border-radius:0 4px 4px 0;'>"
-              +"<div style='font-size:13px;color:#F0F0F0;font-weight:500;'>"+escHtml(b.board)+" › "+escHtml(b.stage)+"</div>"
-              +"<div style='font-size:11px;color:#897C80;margin-top:2px;'>"+b.stuckCount+" stuck deals · "+b.pctAbove+"% above avg</div>"
+              +"<div style='font-size:13px;color:#F0F0F0;font-weight:500;'>"+escHtml(b.board)+" â€º "+escHtml(b.stage)+"</div>"
+              +"<div style='font-size:11px;color:#897C80;margin-top:2px;'>"+b.stuckCount+" stuck deals Â· "+b.pctAbove+"% above avg</div>"
               +"</div>";
           }).join("");
 
-      // ── Today's priorities (role-aware, deterministic) ──
+      // â”€â”€ Today's priorities (role-aware, deterministic) â”€â”€
       var priorityList=getPriorities(person,pd);
       var priorityHtml=priorityList.map(function(p,i){
         return "<div style='margin-bottom:6px;font-size:13px;color:#F0F0F0;'><span style='color:#F28F1D;font-weight:600;margin-right:6px;'>"+(i+1)+".</span>"+escHtml(p)+"</div>";
       }).join("");
 
-      // ── Health section (existing builder, only for nested-access roles) ──
+      // â”€â”€ Health section (existing builder, only for nested-access roles) â”€â”€
       var healthHtml=person.nested?buildEmailHealthSection(pd,personBoards):"";
 
-      // ── Week in review (Mondays only) ──
+      // â”€â”€ Week in review (Mondays only) â”€â”€
       var weekHtml=isMon?(
         "<hr style='border:none;border-top:1px solid rgba(255,255,255,0.08);margin:0;'>"
         +"<div style='padding:18px;'>"
@@ -1308,7 +1309,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
         +"</div>"
       ):"";
 
-      // ── Owner-level team pulse ──
+      // â”€â”€ Owner-level team pulse â”€â”€
       var ownerHtml=isOwner?(
         "<hr style='border:none;border-top:1px solid rgba(255,255,255,0.08);margin:0;'>"
         +"<div style='padding:18px;'>"
@@ -1321,13 +1322,13 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
         +"</tr></table></div>"
       ):"";
 
-      // ── Assemble full email ──
+      // â”€â”€ Assemble full email â”€â”€
       var finalHtml=""
         +"<div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#24262B;color:#F0F0F0;border-radius:8px;overflow:hidden;'>"
         // Section 1: greeting
         +"<div style='padding:18px;'>"
         +"<h1 style='margin:0 0 4px;font-size:20px;color:#F28F1D;font-weight:600;'>Good morning, "+escHtml(firstName)+"</h1>"
-        +"<p style='margin:0;font-size:13px;color:#897C80;'>"+escHtml(day)+" "+new Date().toLocaleDateString()+" · "+escHtml(person.title)+(isMon?" · New week, fresh start.":"")+"</p>"
+        +"<p style='margin:0;font-size:13px;color:#897C80;'>"+escHtml(day)+" "+new Date().toLocaleDateString()+" Â· "+escHtml(person.title)+(isMon?" Â· New week, fresh start.":"")+"</p>"
         +"</div>"
         // Section 2: KPIs
         +"<hr style='border:none;border-top:1px solid rgba(255,255,255,0.08);margin:0;'>"
@@ -1355,7 +1356,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
         // Footer
         +"<hr style='border:none;border-top:1px solid rgba(255,255,255,0.08);margin:0;'>"
         +"<div style='padding:14px 18px;font-size:11px;color:#897C80;text-align:center;'>"
-        +"Read-only system · Unicity Solar Energy · "+(liveApiData?"Live data":"Simulated data")+" · "+new Date().toLocaleTimeString()
+        +"Read-only system Â· Unicity Solar Energy Â· "+(liveApiData?"Live data":"Simulated data")+" Â· "+new Date().toLocaleTimeString()
         +"</div>"
         +"</div>";
 
@@ -1374,19 +1375,19 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
     setSendStatus(function(s){var n=Object.assign({},s);n[i]="sending...";return n;});
     try{
       var html="<div style='font-family:Arial,sans-serif;background:#24262B;color:#F0F0F0;padding:1.5rem;border-radius:8px'>"
-        +"<h2 style='color:#F28F1D;margin:0 0 1rem'>Test briefing — "+m.name+"</h2>"
+        +"<h2 style='color:#F28F1D;margin:0 0 1rem'>Test briefing â€” "+m.name+"</h2>"
         +"<p style='margin:0 0 0.5rem'>Hello "+m.name.split(" ")[0]+",</p>"
         +"<p style='margin:0 0 0.5rem'>This is a manual send from the Unicity Solar KPI dashboard.</p>"
         +"<p style='margin:0 0 0.5rem'>Pipeline summary: <strong>"+pd.totalActiveJobs+"</strong> active jobs, <strong>"+pd.totalStuck+"</strong> stuck, end-to-end avg <strong>"+pd.endToEndDays+"d</strong>.</p>"
-        +"<p style='margin:1.5rem 0 0;font-size:11px;color:#897C80'>Sent "+new Date().toLocaleString()+" — "+(liveApiData?"Live data":"Simulated data")+"</p>"
+        +"<p style='margin:1.5rem 0 0;font-size:11px;color:#897C80'>Sent "+new Date().toLocaleString()+" â€” "+(liveApiData?"Live data":"Simulated data")+"</p>"
         +"</div>";
-      var res=await fetch("/api/email/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({to:m.email,subject:"Unicity KPI Briefing — Test",html:html})});
+      var res=await fetch("/api/email/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({to:m.email,subject:"Unicity KPI Briefing â€” Test",html:html})});
       var data=await res.json();
       if(!res.ok)throw new Error(data.error||"Send failed");
       var entry={id:Date.now(),name:m.name,role:m.role,email:m.email,ts:new Date().toLocaleString(),dataSource:liveApiData?"Live Pipedrive":"Simulated",mode:draft?"Draft":"Live",status:"Sent"};
       setSendLog(function(l){return [entry].concat(l);});
       setSendStatus(function(s){var n=Object.assign({},s);n[i]=new Date().toLocaleTimeString();return n;});
-      addAudit("Email sent",m.name+" — "+entry.dataSource,"system");
+      addAudit("Email sent",m.name+" â€” "+entry.dataSource,"system");
     }catch(err:any){
       setSendStatus(function(s){var n=Object.assign({},s);n[i]="failed";return n;});
       alert("Send failed: "+(err.message||"unknown"));
@@ -1414,8 +1415,8 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
         <p style={{margin:0,fontSize:11,color:th.textMuted}}>Morning KPI briefing system v8</p>
       </div>
       <div style={{marginLeft:"auto",display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-        <span style={{fontSize:11,color:th.textMuted,marginRight:8}}>{session.name||session.email} · <a href="/api/auth/signout" style={{color:C.orange,textDecoration:"none"}}>Sign out</a></span>
-        {liveApiData&&!staleCache&&<Pill text={"Live · "+pd.totalActiveJobs+" jobs"} color="green"/>}
+        <span style={{fontSize:11,color:th.textMuted,marginRight:8}}>{session.name||session.email} Â· <a href="/api/auth/signout" style={{color:C.orange,textDecoration:"none"}}>Sign out</a></span>
+        {liveApiData&&!staleCache&&<Pill text={"Live Â· "+pd.totalActiveJobs+" jobs"} color="green"/>}
         {staleCache&&<Pill text="Cached" color="blue"/>}
         {liveLoad&&<Pill text="Pulling..." color="amber"/>}
         <button onClick={function(){pullLive(false);}} disabled={liveLoad} title="Refresh live Pipedrive data" style={{display:"flex",alignItems:"center",gap:5,background:th.inputBg,border:"1px solid "+th.borderPlain,borderRadius:20,padding:"5px 12px",color:th.textMuted,fontSize:11,cursor:liveLoad?"wait":"pointer"}}>
@@ -1429,7 +1430,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
       </div>
     </div>
 
-    {/* Cron status banner — always visible, makes live/test/paused state unmissable */}
+    {/* Cron status banner â€” always visible, makes live/test/paused state unmissable */}
     <CronStatusBanner status={cronStatus} th={th}/>
 
     {/* Draft/Live banner */}
@@ -1454,7 +1455,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
       </button>;})}
     </div>
 
-    {/* Data-source status banner — visible across all tabs */}
+    {/* Data-source status banner â€” visible across all tabs */}
     {staleCache&&<div style={{background:C.blue+"0d",border:"1px solid "+C.blue+"22",borderRadius:10,padding:"7px 12px",marginBottom:"1rem",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
       <span style={{fontSize:12,color:C.blue}}>Using cached data from {new Date(staleCache.ts).toLocaleTimeString()} &mdash; will re-attempt to pull live data shortly</span>
       <button onClick={function(){pullLive(false);}} disabled={liveLoad} style={{background:C.blue+"22",border:"1px solid "+C.blue+"44",borderRadius:6,color:C.blue,fontWeight:500,fontSize:11,padding:"4px 10px",cursor:liveLoad?"wait":"pointer",flexShrink:0}}>{liveLoad?"Retrying...":"Retry now"}</button>
@@ -1472,19 +1473,19 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
           <div style={{display:"flex",flexDirection:"column",gap:8,marginTop:4}}>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 12px",background:C.green+"0d",border:"1px solid "+C.green+"22",borderRadius:8}}>
               <div>
-                <p style={{margin:0,fontSize:13,color:th.text,fontWeight:500}}><span style={{color:C.green,marginRight:6}}>●</span>Pipedrive</p>
-                <p style={{margin:"2px 0 0",fontSize:11,color:th.textMuted}}>Read-only · server-managed credentials · no setup needed</p>
+                <p style={{margin:0,fontSize:13,color:th.text,fontWeight:500}}><span style={{color:C.green,marginRight:6}}>â—</span>Pipedrive</p>
+                <p style={{margin:"2px 0 0",fontSize:11,color:th.textMuted}}>Read-only Â· server-managed credentials Â· no setup needed</p>
               </div>
               <button onClick={pullLive} disabled={liveLoad} style={{background:C.orange+"22",border:"1px solid "+C.orange+"44",borderRadius:8,color:C.orange,fontWeight:500,fontSize:12,padding:"6px 12px",cursor:"pointer"}}>{liveLoad?"Pulling...":(liveApiData?"Refresh":"Pull live data")}</button>
             </div>
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 12px",background:C.green+"0d",border:"1px solid "+C.green+"22",borderRadius:8}}>
               <div>
-                <p style={{margin:0,fontSize:13,color:th.text,fontWeight:500}}><span style={{color:C.green,marginRight:6}}>●</span>Google Workspace</p>
-                <p style={{margin:"2px 0 0",fontSize:11,color:th.textMuted}}>Sender authorized · briefings sent automatically</p>
+                <p style={{margin:0,fontSize:13,color:th.text,fontWeight:500}}><span style={{color:C.green,marginRight:6}}>â—</span>Google Workspace</p>
+                <p style={{margin:"2px 0 0",fontSize:11,color:th.textMuted}}>Sender authorized Â· briefings sent automatically</p>
               </div>
             </div>
             {liveApiData&&<div style={{padding:"8px 12px",background:C.blue+"08",border:"1px solid "+C.blue+"22",borderRadius:8}}>
-              <p style={{margin:0,fontSize:12,color:C.blue}}>Latest pull: {liveApiData.totalDeals} open deals across {(liveApiData.pipelines||[]).length} pipelines · {apiHealth.lastPull}</p>
+              <p style={{margin:0,fontSize:12,color:C.blue}}>Latest pull: {liveApiData.totalDeals} open deals across {(liveApiData.pipelines||[]).length} pipelines Â· {apiHealth.lastPull}</p>
             </div>}
             {apiErr&&<div style={{padding:"8px 12px",background:C.red+"0d",border:"1px solid "+C.red+"33",borderRadius:8}}>
               <p style={{margin:0,fontSize:12,color:C.red}}>! {apiErr}</p>
@@ -1495,7 +1496,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
           <SLabel icon="ti-clock" text="Send schedule"/>
           <div style={{display:"flex",alignItems:"center",gap:14}}>
             <input type="time" value={sendTime} onChange={function(e){setSendTime(e.target.value);}} style={Object.assign({},iS,{width:130,color:C.orange,fontWeight:500,fontSize:18})}/>
-            <div><p style={{margin:0,fontSize:13,color:th.text,fontWeight:500}}>Weekdays · Mon-Fri</p><p style={{margin:"2px 0 0",fontSize:11,color:th.textMuted}}>Server schedule: 11:00 UTC (7am EDT / 6am EST) · {team.length} recipients · managed via Vercel cron</p></div>
+            <div><p style={{margin:0,fontSize:13,color:th.text,fontWeight:500}}>Weekdays Â· Mon-Fri</p><p style={{margin:"2px 0 0",fontSize:11,color:th.textMuted}}>Server schedule: 11:00 UTC (7am EDT / 6am EST) Â· {team.length} recipients Â· managed via Vercel cron</p></div>
           </div>
         </div>
         <div style={glass}>
@@ -1579,7 +1580,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
       </div>
     </div>}
 
-    {/* INTELLIGENCE — replaces Health tab, backed by pipelineData */}
+    {/* INTELLIGENCE â€” replaces Health tab, backed by pipelineData */}
     {tab==="Intelligence"&&<div>
       <div style={{display:"flex",gap:6,marginBottom:"1rem",flexWrap:"wrap",alignItems:"center"}}>
         <p style={{margin:0,fontSize:13,color:th.textMuted,flex:1}}>Viewing as:</p>
@@ -1758,7 +1759,7 @@ function RalphFormInline({kpiTags,th,iS,onSubmit,onCancel}){
   </div>;
 }
 
-// ── Auth wrapper: handles session, gates dashboard ──
+// â”€â”€ Auth wrapper: handles session, gates dashboard â”€â”€
 export default function App(){
   var [session,setSession]=useState({signedIn:false,email:"",name:"",loaded:false});
   React.useEffect(function(){
@@ -1770,7 +1771,7 @@ export default function App(){
   },[]);
 
   if(!session.loaded){
-    return <div style={{minHeight:"100vh",background:"#1A1C20",display:"flex",alignItems:"center",justifyContent:"center",color:"#897C80",fontFamily:"system-ui,sans-serif"}}>Loading…</div>;
+    return <div style={{minHeight:"100vh",background:"#1A1C20",display:"flex",alignItems:"center",justifyContent:"center",color:"#897C80",fontFamily:"system-ui,sans-serif"}}>Loadingâ€¦</div>;
   }
   if(!session.signedIn){
     return <div style={{minHeight:"100vh",background:"#1A1C20",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"system-ui,sans-serif",padding:"2rem"}}>
@@ -1784,3 +1785,4 @@ export default function App(){
   }
   return <Dashboard session={session}/>;
 }
+
