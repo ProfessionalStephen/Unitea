@@ -8,7 +8,7 @@
   "crons": [
     {
       "path": "/api/cron/send-briefings",
-      "schedule": "0 10 * * 1-5"
+      "schedule": "0 11 * * 1-5"
     }
   ]
 }
