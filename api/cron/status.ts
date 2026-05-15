@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { requireSession } from "../_lib/session.js";
-import { emailedTeam } from "../../shared/domain.js";
+import { emailedTeam } from "../../shared/domain/index.js";
 
 const TEAM = emailedTeam();
 
