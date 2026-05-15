@@ -27,6 +27,122 @@ const TEAM = [
 const LOGO_URL = "https://unicity-kpi.vercel.app/Unicity_Solar_Logo_only.png";
 const DASHBOARD_URL = "https://unicity-kpi.vercel.app";
 
+// ─────────────────────────────────────────────────────────────
+// ROLE → KPIs  (mirror of RT[role].kpis in src/App.tsx)
+// TODO: shared module
+// ─────────────────────────────────────────────────────────────
+const ROLE_KPIS: Record<string, string[]> = {
+  "Owner":                     ["Total active jobs", "Jobs completed this week", "Revenue pipeline value", "Critical bottlenecks", "Cancellation rate", "Avg days to install", "Team utilization rate", "End-to-end pipeline days"],
+  "COO":                       ["Total active jobs", "Jobs completed this week", "Critical bottlenecks", "Avg days per stage", "Cancellation rate", "Pending inspections", "Net metering backlog", "Service tickets open"],
+  "VP of Operations":          ["Total active jobs", "Jobs completed this week", "Critical bottlenecks", "Avg days per stage", "Cancellation rate", "Pending inspections", "Net metering backlog", "Service tickets open"],
+  "Office Manager":            ["Welcome calls due today", "Thank you calls due", "Jobs on hold count", "Missing NTP count", "Overdue activities", "BBB complaints open"],
+  "Installation Manager":      ["Installs scheduled today", "Installs completed yesterday", "Material ordered pending", "Install not completed", "HOA approvals pending", "R&R jobs active"],
+  "Warehouse Manager":         ["Material orders pending", "Installs scheduled this week", "R&R uninstalls scheduled", "Inspections scheduled", "Net metering pending"],
+  "Engineering Coordinator":   ["Ready for engineering", "In revisions", "Needs clarification", "Quality control queue", "Post install revisions", "Waiting on engineers", "Sent to permitting today"],
+  "President of Sales":        ["New deals this week", "Site surveys scheduled", "Deals sent to engineering", "Installs completed", "Funded this week", "Pipeline value", "Cancellation rate"],
+  "AI Back-End Developer":     ["Total active jobs", "Critical bottlenecks", "End-to-end pipeline days"],
+};
+
+// KPI tag configs — sources[] mirror KPI_INIT in src/App.tsx
+type KpiSource = { board: string; scope: "board" | "stage"; stage: string | null; field: string };
+type KpiTag = { name: string; sources: KpiSource[]; fallback: string };
+const KPI_CONFIGS: KpiTag[] = [
+  { name: "Total active jobs",        sources: [], fallback: "N/A" },
+  { name: "End-to-end pipeline days", sources: [], fallback: "N/A" },
+  { name: "Critical bottlenecks",     sources: [], fallback: "0"   },
+  { name: "Ready for engineering",    sources: [{ board: "Engineering", scope: "stage", stage: "Ready for Engineering", field: "stage.deal_count" }], fallback: "0" },
+  { name: "Installs scheduled today", sources: [{ board: "Scheduling/Coordinating", scope: "stage", stage: "Installation Scheduled", field: "stage.deal_count" }], fallback: "0" },
+  { name: "Service tickets open",     sources: [{ board: "Service", scope: "board", stage: null, field: "pipeline.deal_count" }], fallback: "0" },
+  { name: "M1 invoices needed",       sources: [{ board: "Funding", scope: "stage", stage: "M1 Invoice needed", field: "stage.deal_count" }], fallback: "0" },
+];
+
+// Resolver — reads cron's pd shape: { boardData[name]: { totalDeals, stages: [{name, count, avgDays, stuckCount}] } }
+function findStage(pd: any, board: string, stageName: string): any | null {
+  const bd = pd?.boardData?.[board];
+  if (!bd || !bd.stages) return null;
+  const target = String(stageName).toLowerCase();
+  return bd.stages.find((s: any) => s?.name && String(s.name).toLowerCase() === target) || null;
+}
+function extractFromStage(stage: any, field: string): number | null {
+  switch (field) {
+    case "stage.deal_count":   return Number(stage.count ?? 0);
+    case "calc.stuck_count":   return Number(stage.stuckCount ?? 0);
+    case "stage.avg_age_days":
+    case "calc.days_in_stage": return Number(stage.avgDays ?? 0);
+    case "stage.rotten_flag":
+    case "calc.is_rotten":     return (stage.stuckCount ?? 0) > 0 ? 1 : 0;
+    default: return null;
+  }
+}
+function extractFromBoard(boardData: any, field: string): number | null {
+  switch (field) {
+    case "pipeline.deal_count":
+    case "stage.deal_count":   return Number(boardData.totalDeals ?? 0);
+    default: return null;
+  }
+}
+function resolveKpi(name: string, pd: any): string {
+  if (!pd) return "—";
+  // Whole-pipeline aggregates
+  if (name === "Total active jobs")        return String(pd.totalActiveJobs ?? 0);
+  if (name === "End-to-end pipeline days") return String(pd.endToEndDays ?? "—") + (pd.endToEndDays != null ? "d" : "");
+  if (name === "Critical bottlenecks")     return String(pd.stalled?.length ?? 0);
+
+  const cfg = KPI_CONFIGS.find((t) => t.name === name);
+  if (!cfg || cfg.sources.length === 0) return cfg?.fallback || "—";
+
+  let total = 0;
+  let anyMapped = false;
+  const firstField = cfg.sources[0].field;
+
+  for (const src of cfg.sources) {
+    const bd = pd.boardData?.[src.board];
+    if (!bd) continue;
+    let v: number | null = null;
+    if (src.scope === "board") v = extractFromBoard(bd, src.field);
+    else if (src.scope === "stage" && src.stage) {
+      const stage = findStage(pd, src.board, src.stage);
+      if (stage) v = extractFromStage(stage, src.field);
+    }
+    if (v != null) { total += v; anyMapped = true; }
+  }
+  if (!anyMapped) return cfg.fallback || "—";
+  if (firstField === "stage.avg_age_days" || firstField === "calc.days_in_stage") {
+    return (total / cfg.sources.length).toFixed(1) + "d";
+  }
+  if (firstField === "stage.rotten_flag" || firstField === "calc.is_rotten") {
+    return total > 0 ? "Yes" : "No";
+  }
+  return String(Math.round(total));
+}
+
+function buildKpiSection(person: typeof TEAM[number], pd: any): string {
+  const kpis = ROLE_KPIS[person.role] || [];
+  if (kpis.length === 0) return "";
+  const cells = kpis.map((k) => {
+    const v = resolveKpi(k, pd);
+    return `<td width="33%" style="padding:4px;">
+      <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:10px 12px;text-align:center;">
+        <p style="margin:0 0 4px;font-size:11px;color:#897C80;">${escHtml(k)}</p>
+        <p style="margin:0;font-size:18px;font-weight:500;color:#F0F0F0;">${escHtml(v)}</p>
+      </div></td>`;
+  });
+  // Build rows of 3
+  const rows: string[] = [];
+  for (let i = 0; i < cells.length; i += 3) {
+    let row = "<tr>" + cells.slice(i, i + 3).join("");
+    const pad = 3 - Math.min(3, cells.length - i);
+    for (let p = 0; p < pad; p++) row += `<td width="33%" style="padding:4px;"></td>`;
+    rows.push(row + "</tr>");
+  }
+  return `
+    <div style="padding:18px 24px;background:#1A1D22;">
+      <div style="font-size:13px;color:#F28F1D;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;">Your KPIs</div>
+      <table style="width:100%;border-collapse:collapse;">${rows.join("")}</table>
+      <p style="margin:8px 0 0;font-size:10px;color:#6B6266;text-align:center;">Values pulled from Pipedrive. KPIs showing "N/A" need source mapping in dashboard.</p>
+    </div>`;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) return res.status(500).json({ error: "CRON_SECRET not configured" });
@@ -384,12 +500,14 @@ function buildEmail(person: typeof TEAM[number], pd: any, dataSource: string): s
       <a href="${DASHBOARD_URL}" style="display:inline-block;background:linear-gradient(135deg,#F28F1D,#D4721A);color:#fff;padding:8px 18px;border-radius:6px;text-decoration:none;font-weight:500;font-size:13px;">Open dashboard &rarr;</a>
       <div style="margin-top:10px;font-size:10px;color:#6B6266;line-height:1.4;">
         Unicity Solar Energy &middot; ${dataSource === "live" ? "Live Pipedrive snapshot" : "Data unavailable"} &middot; ${new Date().toLocaleString("en-US", { timeZone: "America/New_York" })} ET<br>
-        Read-only system. Numbers update each weekday at 6am ET.
+        Read-only system. Numbers update each weekday at 7am EDT (6am EST).
       </div>
     </div>`;
 
+  const kpiSection = buildKpiSection(person, pd);
+
   return `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;max-width:640px;margin:0 auto;background:#24262B;color:#F0F0F0;border-radius:8px;overflow:hidden;">
-    ${header}${summaryCard}${stalledList}${boardSection}${prioritySection}${ownerSection}${footer}
+    ${header}${summaryCard}${kpiSection}${stalledList}${boardSection}${prioritySection}${ownerSection}${footer}
   </div>`;
 }
 

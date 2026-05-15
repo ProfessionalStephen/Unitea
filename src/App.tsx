@@ -265,26 +265,84 @@ async function fetchPD(_apiKey,setErr,setHealth){
 // ─────────────────────────────────────────────
 
 
+// ─────────────────────────────────────────────
+// KPI VALUE RESOLVER
+// Reads kpiTags configuration (sources[]) against real pipelineData (pd).
+// Returns formatted string. Falls back to tag.fallback (or "—") when:
+//   - tag has no sources configured
+//   - none of the configured sources match a real board/stage
+//   - configured field isn't computable from current pull (e.g. deal.value,
+//     activity.*, calc.completion_rate — those need data we don't pull yet)
+//
+// Whole-pipeline KPIs (totals/aggregates) bypass sources — they're keyed
+// by name. Anything else routes through source resolution.
+//
+// NOTE: duplicated in api/cron/send-briefings.ts for production emails.
+// TODO: extract to shared module when team/boards extraction lands.
+// ─────────────────────────────────────────────
+function extractStageValue(stage, field) {
+  switch (field) {
+    case "stage.deal_count": return stage.jobCount;
+    case "calc.stuck_count": return stage.stuckCount;
+    case "stage.avg_age_days":
+    case "calc.days_in_stage": return stage.avgDays;
+    case "stage.rotten_flag":
+    case "calc.is_rotten": return stage.stuckCount > 0 ? 1 : 0;
+    default: return null; // unmappable in current pd
+  }
+}
+function extractBoardValue(board, field) {
+  switch (field) {
+    case "pipeline.deal_count":
+    case "stage.deal_count": return board.jobCount;
+    case "calc.stuck_count": return board.stuckCount;
+    case "stage.avg_age_days":
+    case "calc.days_in_stage": return board.avgDays;
+    default: return null;
+  }
+}
+function resolveKpiValue(tag, pd) {
+  // Whole-pipeline aggregates — no source config needed
+  if (tag.name === "Total active jobs") return String(pd.totalActiveJobs || 0);
+  if (tag.name === "End-to-end pipeline days") return (pd.endToEndDays || 0) + "d";
+  if (tag.name === "Critical bottlenecks") return String((pd.bottlenecks && pd.bottlenecks.length) || 0);
+
+  if (!tag.sources || tag.sources.length === 0) return tag.fallback || "—";
+
+  var total = 0;
+  var anyMapped = false;
+  var firstField = tag.sources[0].field;
+
+  for (var i = 0; i < tag.sources.length; i++) {
+    var src = tag.sources[i];
+    var board = pd.boards ? pd.boards[src.board] : null;
+    if (!board) continue;
+    var v = null;
+    if (src.scope === "board") {
+      v = extractBoardValue(board, src.field);
+    } else if (src.scope === "stage" && src.stage) {
+      var stage = board.stages ? board.stages[src.stage] : null;
+      if (stage) v = extractStageValue(stage, src.field);
+    }
+    if (v != null) { total += v; anyMapped = true; }
+  }
+  if (!anyMapped) return tag.fallback || "—";
+
+  // Format per field type
+  if (firstField === "stage.avg_age_days" || firstField === "calc.days_in_stage") {
+    return (total / tag.sources.length).toFixed(1) + "d";
+  }
+  if (firstField === "stage.rotten_flag" || firstField === "calc.is_rotten") {
+    return total > 0 ? "Yes" : "No";
+  }
+  return String(Math.round(total));
+}
+
 // Build KPI table HTML from pipelineData — no AI, guaranteed layout
-function buildKpiTableHtml(person, pd, kpiTags, liveApiData) {
+function buildKpiTableHtml(person, pd, kpiTags, _liveApiData) {
   var kpis = person.kpis.map(function(k) {
     var tag = kpiTags.find(function(t) { return t.name === k; });
-    var mapped = tag && tag.sources.length > 0;
-    var val = "—";
-    if (liveApiData && mapped && tag.sources[0]) {
-      var src = tag.sources[0];
-      var bd = liveApiData.boardData ? liveApiData.boardData[src.board] : null;
-      if (bd) {
-        if (src.scope === "board") val = String(bd.totalDeals);
-        else if (src.scope === "stage" && src.stage) {
-          var st = bd.stages ? bd.stages.find(function(s) { return s.name && s.name.toLowerCase() === src.stage.toLowerCase(); }) : null;
-          if (st) val = String(st.count);
-        }
-      }
-    } else {
-      var simMap = {"Total active jobs": String(pd.totalActiveJobs), "End-to-end pipeline days": pd.endToEndDays + "d", "Critical bottlenecks": String(pd.totalStuck), "Cancellation rate": "4.2%", "Revenue pipeline value": "$2.4M"};
-      val = simMap[k] || String(Math.floor(Math.random() * 30) + 1);
-    }
+    var val = tag ? resolveKpiValue(tag, pd) : "—";
     return {name: k, val: val};
   });
 
@@ -456,11 +514,11 @@ function buildEmailHealthSection(pd, memberBoards) {
       +"<summary style='padding:10px 14px;background:"+col+"15;cursor:pointer;list-style:none;font-family:Arial,sans-serif;'>"
       +"<table width='100%' cellpadding='0' cellspacing='0' border='0'><tr>"
       +"<td style='color:"+col+";font-size:13px;font-weight:500;'>"+icon+" "+bName+" &mdash; "+b.jobCount+" jobs</td>"
-      +"<td style='text-align:right;color:"+col+";font-size:11px;'>"+b.avgDays+"d avg &middot; "+b.healthScore+" score &#9662;</td>"
+      +"<td style='text-align:right;color:"+col+";font-size:11px;'>"+b.avgDays+"d avg &middot; "+b.stuckCount+" stuck &#9662;</td>"
       +"</tr></table></summary>"
       +"<div style='padding:10px 14px;background:#1E2228;font-family:Arial,sans-serif;'>"
       +"<p style='margin:0 0 5px;font-size:11px;color:#897C80;'>"+stageInfo+"</p>"
-      +"<p style='margin:0;font-size:11px;color:#897C80;'>Avg days in board: "+b.avgDays+"d &middot; Historical avg: "+b.historicalAvg+"d</p>"
+      +"<p style='margin:0;font-size:11px;color:#897C80;'>Avg days in board: "+b.avgDays+"d &middot; "+b.jobCount+" jobs &middot; "+b.stuckCount+" past rotting threshold</p>"
       +"</div></details></div>";
   }).join("");
 
@@ -890,7 +948,7 @@ const PD_FIELDS_FLAT=[
   {n:"calc.days_in_stage",d:"Days since deal entered current stage",r:"Integer"},{n:"calc.is_rotten",d:"True if past rotting threshold",r:"Boolean"},{n:"calc.stuck_count",d:"Deals past rotting threshold",r:"Integer"},{n:"calc.completion_rate",d:"Won deals / total deals",r:"Percentage"},{n:"calc.board_health_score",d:"Composite health score 0-100",r:"Integer"},
 ];
 
-function KpiMapping({kpiTags,setKpiTags,team,th}){
+function KpiMapping({kpiTags,setKpiTags,team,th,pd}){
   var [sel,setSel]=useState(kpiTags[0]?kpiTags[0].id:null);
   var [newName,setNewName]=useState("");var [testing,setTesting]=useState(null);var [cfmDel,setCfmDel]=useState(null);var [tagSearch,setTagSearch]=useState("");
   var tag=kpiTags.find(function(t){return t.id===sel;});
@@ -904,7 +962,23 @@ function KpiMapping({kpiTags,setKpiTags,team,th}){
   function addTag(){var n=newName.trim();if(!n)return;setKpiTags(function(ts){return ts.concat([{id:"k"+Date.now(),name:n,sources:[],fallback:"N/A",testResult:null}]);});setNewName("");}
   function delTag(tid){if(cfmDel!==tid){setCfmDel(tid);setTimeout(function(){setCfmDel(function(c){return c===tid?null:c;});},3000);return;}setKpiTags(function(ts){return ts.filter(function(t){return t.id!==tid;});});if(sel===tid)setSel(null);setCfmDel(null);}
   function usedBy(name){return team.filter(function(m){return m.kpis.indexOf(name)>=0;}).length;}
-  async function testTag(tid){setTesting(tid);await new Promise(function(r){setTimeout(r,1200);});setKpiTags(function(ts){return ts.map(function(t){return t.id===tid?Object.assign({},t,{testResult:Math.floor(Math.random()*24)+" (simulated)"}):t;});});setTesting(null);}
+  function testTag(tid){
+    setTesting(tid);
+    setTimeout(function(){
+      setKpiTags(function(ts){return ts.map(function(t){
+        if(t.id!==tid)return t;
+        var result;
+        if(!pd){result="No data — pull Pipedrive first";}
+        else{
+          var val=resolveKpiValue(t,pd);
+          var liveLabel=pd.isLive?"":" (no live data — fallback)";
+          result=val+liveLabel;
+        }
+        return Object.assign({},t,{testResult:result});
+      });});
+      setTesting(null);
+    },300);
+  }
 
   return <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
     <div style={{width:210,flexShrink:0}}>
@@ -1398,7 +1472,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
         </div>
         <button onClick={function(){setSaved(true);addAudit("Configuration saved","General settings updated","system");setTimeout(function(){setSaved(false);},2000);}} style={{alignSelf:"flex-start",background:saved?C.green+"18":"linear-gradient(135deg,"+C.orange+","+C.orangeDeep+")",color:saved?C.green:"#fff",border:saved?"1px solid "+C.green:"none",borderRadius:12,padding:"10px 24px",fontSize:14,fontWeight:500,cursor:"pointer"}}>{saved?"Saved":"Save configuration"}</button>
       </div>}
-      {stab==="KPI Mapping"&&<KpiMapping kpiTags={kpiTags} setKpiTags={setKpiTags} team={team} th={th}/>}
+      {stab==="KPI Mapping"&&<KpiMapping kpiTags={kpiTags} setKpiTags={setKpiTags} team={team} th={th} pd={pd}/>}
       {stab==="Pipedrive Fields"&&<div>
         <p style={{fontSize:13,color:th.textMuted,margin:"0 0 1rem"}}>All available Pipedrive data points for KPI mapping.</p>
         <div style={{display:"flex",flexDirection:"column",gap:4}}>
