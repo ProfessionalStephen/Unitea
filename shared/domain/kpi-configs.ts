@@ -12,7 +12,7 @@
 // specific board/stage need sources[] populated.
 // ─────────────────────────────────────────────────────────────
 
-import type { KpiTag, PdField } from "./types";
+import type { KpiTag, PdField } from "./types.js";
 
 // Canonical KPI defaults — union of frontend & cron previous versions
 //

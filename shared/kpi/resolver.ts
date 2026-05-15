@@ -18,10 +18,10 @@
 //   2. KpiMapping UI dropdown (PD_FIELDS_FLAT) already exposes it
 // ─────────────────────────────────────────────────────────────
 
-import type { KpiTag } from "../domain/types";
-import { KPI_INIT } from "../domain/kpi-configs";
-import { RT } from "../domain/roles";
-import type { PipelineView, NormStage, NormBoard } from "./view";
+import type { KpiTag } from "../domain/types.js";
+import { KPI_INIT } from "../domain/kpi-configs.js";
+import { RT } from "../domain/roles.js";
+import type { PipelineView, NormStage, NormBoard } from "./view.js";
 
 // ─── Formatters ──────────────────────────────────────────────
 export function fmtMoneyCompact(n: number): string {

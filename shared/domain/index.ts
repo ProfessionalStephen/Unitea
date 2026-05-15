@@ -1,10 +1,10 @@
 // ─────────────────────────────────────────────────────────────
 // SHARED DOMAIN — Barrel re-exports.
-// Import from "./shared/domain" (frontend) or "../../shared/domain" (api).
+// Import from "./shared/domain.js" (frontend) or "../../shared/domain" (api).
 // ─────────────────────────────────────────────────────────────
 
-export * from "./types";
-export * from "./boards";
-export * from "./roles";
-export * from "./team";
-export * from "./kpi-configs";
+export * from "./types.js";
+export * from "./boards.js";
+export * from "./roles.js";
+export * from "./team.js";
+export * from "./kpi-configs.js";

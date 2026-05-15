@@ -9,7 +9,7 @@
 //   - rotting: per-stage day threshold; a deal past this is "stuck"
 // ─────────────────────────────────────────────────────────────
 
-import type { BoardConfig } from "./types";
+import type { BoardConfig } from "./types.js";
 
 export const BOARDS: Record<string, BoardConfig> = {
   "Customer Service": { region: "FL", stages: ["Ready for Welcome Call", "Job on hold", "Welcome Call Complete", "Thank You Call - Install Complete"], rotting: { "Ready for Welcome Call": 1, "Job on hold": 1 } },

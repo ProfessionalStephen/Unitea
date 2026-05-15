@@ -10,7 +10,7 @@
 //                            should `return` immediately if null.
 //
 // Adding a new endpoint:
-//   1. import { requireSession } from "../_lib/session";
+//   1. import { requireSession } from "../_lib/session.js";
 //   2. const session = await requireSession(req, res); if (!session) return;
 //   3. use session.email / session.name
 //

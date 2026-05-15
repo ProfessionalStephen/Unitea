@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { requireSession } from "../_lib/session";
-import { readSnapshot } from "../_lib/snapshot";
+import { requireSession } from "../_lib/session.js";
+import { readSnapshot } from "../_lib/snapshot.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const session = await requireSession(req, res);

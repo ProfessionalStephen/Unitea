@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { requireSession } from "../_lib/session";
-import { listSnapshots, readSnapshot } from "../_lib/snapshot";
-import { baselineDateForRange, compareSnapshots, nearestSnapshotOnOrBefore } from "../../shared/history/compare";
+import { requireSession } from "../_lib/session.js";
+import { listSnapshots, readSnapshot } from "../_lib/snapshot.js";
+import { baselineDateForRange, compareSnapshots, nearestSnapshotOnOrBefore } from "../../shared/history/compare.js";
 
 // ─────────────────────────────────────────────────────────────
 // Snapshot comparison endpoint
