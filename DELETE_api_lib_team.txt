@@ -1,0 +1,1 @@
+After extracting: delete the file api/_lib/team.ts — superseded by shared/domain/team.ts
