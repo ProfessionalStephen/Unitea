@@ -41,6 +41,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       activitiesDueToday: pd.activitiesDueToday,
       activitiesOverdue: pd.activitiesOverdue,
       callsDueToday: pd.callsDueToday,
+      // Time-window aggregates (Cycle 5)
+      installsCompletedYesterday: pd.installsCompletedYesterday,
+      installsScheduledThisWeek: pd.installsScheduledThisWeek,
+      permitsSubmittedThisWeek: pd.permitsSubmittedThisWeek,
+      sentToPermittingToday: pd.sentToPermittingToday,
+      nmaSubmittedThisWeek: pd.nmaSubmittedThisWeek,
+      serviceRequestsToday: pd.serviceRequestsToday,
+      techniciansScheduledToday: pd.techniciansScheduledToday,
+      inspectionsScheduledToday: pd.inspectionsScheduledToday,
       // Tactical lists (frontend may want these in future)
       stalled: pd.stalled,
       moved24h: pd.moved24h,

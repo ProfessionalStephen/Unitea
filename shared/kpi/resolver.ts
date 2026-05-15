@@ -19,6 +19,8 @@
 // ─────────────────────────────────────────────────────────────
 
 import type { KpiTag } from "../domain/types";
+import { KPI_INIT } from "../domain/kpi-configs";
+import { RT } from "../domain/roles";
 import type { PipelineView, NormStage, NormBoard } from "./view";
 
 // ─── Formatters ──────────────────────────────────────────────
@@ -27,6 +29,47 @@ export function fmtMoneyCompact(n: number): string {
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000)     return `$${Math.round(n / 1_000)}k`;
   return `$${Math.round(n)}`;
+}
+
+// ─── App-internal aggregates ─────────────────────────────────
+// Computed off the KPI registry itself, not Pipedrive. Stable across calls.
+
+// Coverage: percent of role-listed KPI names that resolve to a real source.
+// A KPI counts as covered if it's in KPI_INIT (source-driven OR aggregate name)
+// or if it's handled by the tryNamedAggregate switch above. This function
+// approximates the second by checking KPI_INIT presence — name-only aggregates
+// like "Total active jobs" appear in KPI_INIT with sources: [].
+function kpiCoverageRate(): string {
+  const known = new Set(KPI_INIT.map((k) => k.name));
+  const roleKpis = new Set<string>();
+  for (const role of Object.keys(RT)) {
+    for (const k of RT[role].kpis) roleKpis.add(k);
+  }
+  if (roleKpis.size === 0) return "0%";
+  let hit = 0;
+  for (const name of roleKpis) if (known.has(name)) hit += 1;
+  return Math.round((hit / roleKpis.size) * 100) + "%";
+}
+
+function unmappedKpiCount(): number {
+  const known = new Set(KPI_INIT.map((k) => k.name));
+  const roleKpis = new Set<string>();
+  for (const role of Object.keys(RT)) {
+    for (const k of RT[role].kpis) roleKpis.add(k);
+  }
+  let miss = 0;
+  for (const name of roleKpis) if (!known.has(name)) miss += 1;
+  return miss;
+}
+
+// Summary like "M1: 3 | M2: 0 | M3: 1" — sourced from Funding board stages.
+function m1m2m3Summary(view: PipelineView): string {
+  const f = view.boards["Funding"];
+  if (!f) return "—";
+  const m1 = f.stages["M1 Invoice needed"]?.jobCount ?? 0;
+  const m2 = f.stages["M2 invoice needed"]?.jobCount ?? 0;
+  const m3 = f.stages["M3 invoice needed"]?.jobCount ?? 0;
+  return `M1: ${m1} | M2: ${m2} | M3: ${m3}`;
 }
 
 // ─── Field extractors ────────────────────────────────────────
@@ -59,18 +102,24 @@ function extractFromBoard(board: NormBoard, field: string): number | null {
 // Returns a formatted string when name matches; null otherwise.
 function tryNamedAggregate(name: string, view: PipelineView, fallback: string): string | null {
   switch (name) {
-    case "Total active jobs":         return String(view.totalActiveJobs);
+    case "Total active jobs":
+    case "Pipeline deals active":
+      return String(view.totalActiveJobs);
+
     case "End-to-end pipeline days":  return view.endToEndDays > 0 ? view.endToEndDays + "d" : fallback;
-    case "Critical bottlenecks":      return String(view.bottlenecksCount);
+
+    case "Critical bottlenecks":
+    case "Board health overview":
+      return String(view.bottlenecksCount);
 
     case "Revenue pipeline value":
     case "Pipeline value":
-    case "Funding pipeline value":
       return view.totalPipelineValue > 0 ? fmtMoneyCompact(view.totalPipelineValue) : fallback;
 
     case "Jobs completed this week":
     case "Installs completed":
     case "Funded this week":
+    case "New deals this week":
       return String(view.wonThisWeek);
 
     case "Cancellation rate":
@@ -79,6 +128,7 @@ function tryNamedAggregate(name: string, view: PipelineView, fallback: string): 
         : fallback;
 
     case "Avg days to install":
+    case "Avg days per stage":
       return view.endToEndDays > 0 ? view.endToEndDays + "d (approx)" : fallback;
 
     case "Overdue activities":        return String(view.activitiesOverdue);
@@ -89,6 +139,22 @@ function tryNamedAggregate(name: string, view: PipelineView, fallback: string): 
     case "Welcome calls completed":
     case "Welcome calls pending":
       return view.callsDueToday + " calls today";
+
+    // App-internal aggregates over the resolver/config itself.
+    // Computed from KPI_INIT — bounded, predictable, no Pipedrive call needed.
+    case "KPI coverage rate":         return kpiCoverageRate();
+    case "Unmapped KPI tags":         return String(unmappedKpiCount());
+    case "M1/M2/M3 invoice status":   return m1m2m3Summary(view);
+
+    // Cycle 5 — time-window aggregates from pullPipedrive
+    case "Installs completed yesterday":  return String(view.installsCompletedYesterday);
+    case "Installs scheduled this week":  return String(view.installsScheduledThisWeek);
+    case "Permits submitted this week":   return String(view.permitsSubmittedThisWeek);
+    case "Sent to permitting today":      return String(view.sentToPermittingToday);
+    case "NMA submitted this week":       return String(view.nmaSubmittedThisWeek);
+    case "Service requests today":        return String(view.serviceRequestsToday);
+    case "Technicians scheduled today":   return String(view.techniciansScheduledToday);
+    case "Inspections scheduled today":   return String(view.inspectionsScheduledToday);
 
     default: return null;
   }

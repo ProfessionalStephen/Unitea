@@ -65,6 +65,17 @@ export type PipelineData = {
   activitiesDueToday: number;          // open activities with due_date == today ET
   activitiesOverdue: number;           // open activities with due_date < today ET
   callsDueToday: number;               // subset where type == "call"
+
+  // Time-window aggregates — Cycle 5. All counts.
+  // Yesterday = ET calendar day before today. ThisWeek = Monday ET .. today inclusive.
+  installsCompletedYesterday: number;   // wonDeals.won_time on yesterday + scheduling/coordinating origin
+  installsScheduledThisWeek: number;    // open deals moved into "Installation Scheduled" since Monday
+  permitsSubmittedThisWeek: number;     // open deals moved into "Permit Submitted" since Monday
+  sentToPermittingToday: number;        // open deals moved into "Sent to Permitting" today
+  nmaSubmittedThisWeek: number;         // open deals moved into "NMA submitted to Utility" since Monday
+  serviceRequestsToday: number;         // open deals added to Service board today (Service Needed)
+  techniciansScheduledToday: number;    // open deals in "Service Scheduled" w/ stage_change today
+  inspectionsScheduledToday: number;    // open deals in "Inspection Scheduled" w/ stage_change today
 };
 
 function daysSince(iso: string | null | undefined): number {
@@ -110,6 +121,18 @@ function nDaysAgoEt(n: number): string {
   const [y, m, d] = todayStr.split("-").map(Number);
   const utcMidday = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
   return easternYMD(new Date(utcMidday.getTime() - n * 86400000));
+}
+
+function yesterdayEt(): string {
+  return nDaysAgoEt(1);
+}
+
+// True when iso falls on the given ET calendar day.
+function isOnEtDay(iso: string | undefined | null, ymd: string): boolean {
+  if (!iso) return false;
+  const t = Date.parse(iso);
+  if (isNaN(t)) return false;
+  return new Date(t).toISOString().slice(0, 10) === ymd;
 }
 
 function isWithinIsoRange(iso: string | undefined | null, startYMD: string, endYMD: string): boolean {
@@ -266,6 +289,51 @@ export async function pullPipedrive(domain: string, apiKey: string): Promise<Pip
   const activitiesOverdue = activities.filter((a: any) => isBeforeYMD(a.due_date, todayYMD)).length;
   const callsDueToday = activities.filter((a: any) => a.due_date === todayYMD && a.type === "call").length;
 
+  // ── Time-window aggregates (Cycle 5) ──
+  // Cheap: derived from already-fetched openDeals + wonDeals + stagesArr.
+  // No new HTTP calls. Each KPI is "count of deals in [stage], stage_change_time in [window]".
+  const yesterdayYMD = yesterdayEt();
+  const stageById = new Map<number, string>();
+  for (const s of stagesArr) stageById.set(s.id, s.name);
+
+  function stageNameOf(deal: any): string {
+    return stageById.get(deal.stage_id) || "";
+  }
+  // Counts open deals whose current stage matches `stageName` and whose
+  // stage_change_time falls in the requested window. `daySpec` is either a
+  // ET YMD string (single-day) or a [startYMD, endYMD] inclusive range.
+  function countOpenAt(stageName: string, daySpec: string | [string, string]): number {
+    return openDeals.filter((d: any) => {
+      if (stageNameOf(d) !== stageName) return false;
+      const iso = d.stage_change_time;
+      if (Array.isArray(daySpec)) return isWithinIsoRange(iso, daySpec[0], daySpec[1]);
+      return isOnEtDay(iso, daySpec);
+    }).length;
+  }
+  function countWonOn(stageName: string, ymd: string): number {
+    // wonDeals retain stage_id at time of win; "Installation Completed" / similar
+    // stage names indicate installation milestones.
+    return wonDeals.filter((d: any) => {
+      if (stageNameOf(d) !== stageName) return false;
+      return isOnEtDay(d.won_time, ymd);
+    }).length;
+  }
+
+  const weekRange: [string, string] = [mondayYMD, todayYMD];
+
+  const installsCompletedYesterday =
+    // Either a won deal whose final stage was Installation Completed, or an open
+    // deal currently in that stage that moved in yesterday.
+    countWonOn("Installation Completed", yesterdayYMD) +
+    countOpenAt("Installation Completed", yesterdayYMD);
+  const installsScheduledThisWeek = countOpenAt("Installation Scheduled", weekRange);
+  const permitsSubmittedThisWeek = countOpenAt("Permit Submitted", weekRange);
+  const sentToPermittingToday = countOpenAt("Sent to Permitting", todayYMD);
+  const nmaSubmittedThisWeek = countOpenAt("NMA submitted to Utility", weekRange);
+  const serviceRequestsToday = countOpenAt("Service Needed", todayYMD);
+  const techniciansScheduledToday = countOpenAt("Service Scheduled", todayYMD);
+  const inspectionsScheduledToday = countOpenAt("Inspection Scheduled", todayYMD);
+
   const endToEndDays = Object.values(boardData)
     .filter((b) => b.totalDeals > 0)
     .reduce((sum, b) => sum + b.avgDays, 0);
@@ -282,5 +350,13 @@ export async function pullPipedrive(domain: string, apiKey: string): Promise<Pip
     lostLast30d, lostLast30dValue,
     cancellationRate30d,
     activitiesDueToday, activitiesOverdue, callsDueToday,
+    installsCompletedYesterday,
+    installsScheduledThisWeek,
+    permitsSubmittedThisWeek,
+    sentToPermittingToday,
+    nmaSubmittedThisWeek,
+    serviceRequestsToday,
+    techniciansScheduledToday,
+    inspectionsScheduledToday,
   };
 }

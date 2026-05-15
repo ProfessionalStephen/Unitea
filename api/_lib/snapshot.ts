@@ -23,6 +23,29 @@ export type PipelineSnapshot = {
   stalled: any[];
   moved24h: any[];
   pipelines: Array<{ id: number; name: string }>;
+  // Aggregates — required for History-tab range comparisons.
+  // If any of these are missing from a stored snapshot, that snapshot was
+  // written before this schema change; readers should treat missing fields as 0.
+  totalPipelineValue: number;
+  endToEndDays: number;
+  wonThisWeek: number;
+  wonThisWeekValue: number;
+  wonLast30d: number;
+  lostLast30d: number;
+  lostLast30dValue: number;
+  cancellationRate30d: number;
+  activitiesDueToday: number;
+  activitiesOverdue: number;
+  callsDueToday: number;
+  // Time-window aggregates (Cycle 5)
+  installsCompletedYesterday: number;
+  installsScheduledThisWeek: number;
+  permitsSubmittedThisWeek: number;
+  sentToPermittingToday: number;
+  nmaSubmittedThisWeek: number;
+  serviceRequestsToday: number;
+  techniciansScheduledToday: number;
+  inspectionsScheduledToday: number;
 };
 
 export type SnapshotIndexEntry = {
@@ -49,7 +72,28 @@ function easternDateKey(d: Date = new Date()): string {
 }
 
 export async function writeSnapshot(
-  pipelineData: Omit<PipelineSnapshot, "version" | "capturedAt" | "date" | "dataSource"> & { totalActiveJobs?: number },
+  pipelineData: Omit<PipelineSnapshot, "version" | "capturedAt" | "date" | "dataSource"> & {
+    totalActiveJobs?: number;
+    totalPipelineValue?: number;
+    endToEndDays?: number;
+    wonThisWeek?: number;
+    wonThisWeekValue?: number;
+    wonLast30d?: number;
+    lostLast30d?: number;
+    lostLast30dValue?: number;
+    cancellationRate30d?: number;
+    activitiesDueToday?: number;
+    activitiesOverdue?: number;
+    callsDueToday?: number;
+    installsCompletedYesterday?: number;
+    installsScheduledThisWeek?: number;
+    permitsSubmittedThisWeek?: number;
+    sentToPermittingToday?: number;
+    nmaSubmittedThisWeek?: number;
+    serviceRequestsToday?: number;
+    techniciansScheduledToday?: number;
+    inspectionsScheduledToday?: number;
+  },
   dataSource: "live" | "simulated"
 ): Promise<SnapshotIndexEntry> {
   const date = easternDateKey();
@@ -63,6 +107,26 @@ export async function writeSnapshot(
     stalled: pipelineData.stalled ?? [],
     moved24h: pipelineData.moved24h ?? [],
     pipelines: pipelineData.pipelines ?? [],
+    // Aggregates — copied verbatim from pullPipedrive's PipelineData
+    totalPipelineValue: pipelineData.totalPipelineValue ?? 0,
+    endToEndDays: pipelineData.endToEndDays ?? 0,
+    wonThisWeek: pipelineData.wonThisWeek ?? 0,
+    wonThisWeekValue: pipelineData.wonThisWeekValue ?? 0,
+    wonLast30d: pipelineData.wonLast30d ?? 0,
+    lostLast30d: pipelineData.lostLast30d ?? 0,
+    lostLast30dValue: pipelineData.lostLast30dValue ?? 0,
+    cancellationRate30d: pipelineData.cancellationRate30d ?? 0,
+    activitiesDueToday: pipelineData.activitiesDueToday ?? 0,
+    activitiesOverdue: pipelineData.activitiesOverdue ?? 0,
+    callsDueToday: pipelineData.callsDueToday ?? 0,
+    installsCompletedYesterday: pipelineData.installsCompletedYesterday ?? 0,
+    installsScheduledThisWeek: pipelineData.installsScheduledThisWeek ?? 0,
+    permitsSubmittedThisWeek: pipelineData.permitsSubmittedThisWeek ?? 0,
+    sentToPermittingToday: pipelineData.sentToPermittingToday ?? 0,
+    nmaSubmittedThisWeek: pipelineData.nmaSubmittedThisWeek ?? 0,
+    serviceRequestsToday: pipelineData.serviceRequestsToday ?? 0,
+    techniciansScheduledToday: pipelineData.techniciansScheduledToday ?? 0,
+    inspectionsScheduledToday: pipelineData.inspectionsScheduledToday ?? 0,
   };
 
   const pathname = `${PREFIX}${date}.json`;
