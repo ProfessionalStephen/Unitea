@@ -1,10 +1,26 @@
-# Unitea Agent Specializations
+﻿# Unitea Agent Specializations
 
 Delegation framework for completing the Unitea KPI system work. Each agent handles a specific domain.
 
 ---
 
-## 1. **Pipedrive Data Alignment Agent** 🔄
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues at github.com/ProfessionalStephen/Unitea. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default vocabulary (needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
+---
+
+## 1. **Pipedrive Data Alignment Agent** ðŸ”„
 
 **Specialization**: Diagnosing and fixing data mismatches between config and live sources
 
@@ -12,7 +28,7 @@ Delegation framework for completing the Unitea KPI system work. Each agent handl
 - Verify Pipedrive account pipeline configuration
 - Match BOARDS config to actual Pipedrive pipelines
 - Fix missing/orphaned board definitions
-- Validate data flow from Pipedrive API → Frontend
+- Validate data flow from Pipedrive API â†’ Frontend
 
 ### Tasks Assigned
 - [ ] **Fix Pipedrive boards config mismatch** (Issue #1)
@@ -33,13 +49,13 @@ Delegation framework for completing the Unitea KPI system work. Each agent handl
 4. Validation: Screenshots of Boards tab with all green indicators
 
 ### Success Criteria
-✅ All 16 boards visible on Dashboard  
-✅ No grayed-out boards with 0 jobs  
-✅ Pipedrive live=true for all boards
+âœ… All 16 boards visible on Dashboard  
+âœ… No grayed-out boards with 0 jobs  
+âœ… Pipedrive live=true for all boards
 
 ---
 
-## 2. **KPI Mapping & Coverage Agent** 📊
+## 2. **KPI Mapping & Coverage Agent** ðŸ“Š
 
 **Specialization**: KPI configuration, source mapping, and role wiring
 
@@ -47,7 +63,7 @@ Delegation framework for completing the Unitea KPI system work. Each agent handl
 - Map KPIs to Pipedrive data sources (board/stage/field)
 - Handle missing KPIs (27 to review)
 - Resolve duplicate KPI aliases
-- Document KPI→role assignments
+- Document KPIâ†’role assignments
 - Ensure every role has meaningful KPIs
 
 ### Tasks Assigned
@@ -57,10 +73,10 @@ Delegation framework for completing the Unitea KPI system work. Each agent handl
   - Accounting Manager: replace accounting KPIs
   
 - [ ] **Consolidate duplicate KPI aliases** (Issue #3)
-  - Merge "Pipeline deals active" ↔ "Total active jobs"
-  - Merge "Material orders pending" ↔ "Material ordered pending"
-  - Merge "HOA approvals pending" ↔ "HOA pending approvals"
-  - Merge "Net metering backlog" ↔ "Net metering pending"
+  - Merge "Pipeline deals active" â†” "Total active jobs"
+  - Merge "Material orders pending" â†” "Material ordered pending"
+  - Merge "HOA approvals pending" â†” "HOA pending approvals"
+  - Merge "Net metering backlog" â†” "Net metering pending"
   - Create DRY reference system
 
 ### Input Requirements
@@ -70,20 +86,20 @@ Delegation framework for completing the Unitea KPI system work. Each agent handl
 - BOARDS config (available stages)
 
 ### Output Deliverables
-1. KPI mapping spreadsheet: name → source → roles
+1. KPI mapping spreadsheet: name â†’ source â†’ roles
 2. 3 role KPI assignments (verified to exist in Pipedrive)
 3. Updated KPI_INIT with consolidated aliases
 4. Test results: all KPIs resolve to valid values
 
 ### Success Criteria
-✅ No roles with 0 KPIs  
-✅ All KPI sources verified in Pipedrive  
-✅ No duplicate aliases in config  
-✅ Every KPI resolves in test mode
+âœ… No roles with 0 KPIs  
+âœ… All KPI sources verified in Pipedrive  
+âœ… No duplicate aliases in config  
+âœ… Every KPI resolves in test mode
 
 ---
 
-## 3. **Code Quality & Refactoring Agent** 🏗️
+## 3. **Code Quality & Refactoring Agent** ðŸ—ï¸
 
 **Specialization**: Architecture improvements, testing, and maintainability
 
@@ -119,14 +135,14 @@ Delegation framework for completing the Unitea KPI system work. Each agent handl
 4. Coverage report: >85% for critical paths
 
 ### Success Criteria
-✅ App.tsx <300 lines (root only)  
-✅ All tab components <400 lines each  
-✅ Tests pass: vitest run (all 136+)  
-✅ Coverage report shows improvements
+âœ… App.tsx <300 lines (root only)  
+âœ… All tab components <400 lines each  
+âœ… Tests pass: vitest run (all 136+)  
+âœ… Coverage report shows improvements
 
 ---
 
-## 4. **Feature Implementation & ADR Agent** 🚀
+## 4. **Feature Implementation & ADR Agent** ðŸš€
 
 **Specialization**: Advanced features, decision records, and safety mechanisms
 
@@ -148,7 +164,7 @@ Delegation framework for completing the Unitea KPI system work. Each agent handl
   - Build auto-triage for user-reported KPI issues
   - Link RALPH panel to resolver feedback
   - Auto-suggest corrections based on patterns
-  - Status workflow: R→A→L→P→H
+  - Status workflow: Râ†’Aâ†’Lâ†’Pâ†’H
   - Reference: docs/adr/ADR-002-ralph-automated-loop.md
 
 ### Input Requirements
@@ -164,10 +180,10 @@ Delegation framework for completing the Unitea KPI system work. Each agent handl
 4. Test suite for new flows
 
 ### Success Criteria
-✅ Cannot push to live without confirmation  
-✅ Confirmation shows list of draft changes  
-✅ RALPH issues auto-categorize per spec  
-✅ Feedback loop drives resolver improvements
+âœ… Cannot push to live without confirmation  
+âœ… Confirmation shows list of draft changes  
+âœ… RALPH issues auto-categorize per spec  
+âœ… Feedback loop drives resolver improvements
 
 ---
 
@@ -176,9 +192,9 @@ Delegation framework for completing the Unitea KPI system work. Each agent handl
 ### Sequential Execution (Recommended Order)
 ```
 1. Pipedrive Data Alignment (unblocks others)
-   └─> 2. KPI Mapping & Coverage (depends on verified data sources)
-       └─> 3. Code Quality & Refactoring (polish phase)
-           └─> 4. Feature Implementation (final phase)
+   â””â”€> 2. KPI Mapping & Coverage (depends on verified data sources)
+       â””â”€> 3. Code Quality & Refactoring (polish phase)
+           â””â”€> 4. Feature Implementation (final phase)
 ```
 
 ### Parallel Execution (If Timeline Tight)
@@ -226,7 +242,7 @@ Steps:
    - Add to KPI_INIT if not present
    - Wire to role in RT[role].kpis
 3. For 27 deleted KPIs:
-   - For each: can we map to Pipedrive? (if yes → A/B/C, if no → D)
+   - For each: can we map to Pipedrive? (if yes â†’ A/B/C, if no â†’ D)
    - Document decision in ADR or updated triage table
 4. Find all KPI aliases (same source, different names)
 5. Consolidate: create primary name, deprecate aliases in comments
@@ -278,7 +294,7 @@ Steps for ADR-002:
 4. Auto-categorize: scan issue text for keywords (revisions, stuck, stale, etc.)
 5. Suggest stage: "L - Learning" if known pattern
 6. Link to resolver: when issue marked "H - Hardened", update resolver
-7. Test: full workflow R→A→L→P→H with audit trail
+7. Test: full workflow Râ†’Aâ†’Lâ†’Pâ†’H with audit trail
 
 Input: ADR-001 spec, ADR-002 spec, current UI code
 Output: Modal components, RALPH enhancements, E2E tests
@@ -290,26 +306,26 @@ Output: Modal components, RALPH enhancements, E2E tests
 
 | Agent | Task | Status | Owner | ETA |
 |-------|------|--------|-------|-----|
-| Pipedrive | Fix boards config | Not started | — | — |
-| KPI | Map 3 roles | Not started | — | — |
-| KPI | Consolidate aliases | Not started | — | — |
-| Code Quality | Split App.tsx | Not started | — | — |
-| Code Quality | Add resolver tests | Not started | — | — |
-| Feature | ADR-001 implementation | Not started | — | — |
-| Feature | ADR-002 implementation | Not started | — | — |
+| Pipedrive | Fix boards config | Not started | â€” | â€” |
+| KPI | Map 3 roles | Not started | â€” | â€” |
+| KPI | Consolidate aliases | Not started | â€” | â€” |
+| Code Quality | Split App.tsx | Not started | â€” | â€” |
+| Code Quality | Add resolver tests | Not started | â€” | â€” |
+| Feature | ADR-001 implementation | Not started | â€” | â€” |
+| Feature | ADR-002 implementation | Not started | â€” | â€” |
 
 ---
 
-## Quick Reference: Issue→Agent Routing
+## Quick Reference: Issueâ†’Agent Routing
 
 | Issue | Title | Agent | Priority |
 |-------|-------|-------|----------|
-| #1 | 2-board Pipedrive limitation | Pipedrive Data | 🔴 Critical |
-| #2 | 3 roles with 0 KPIs | KPI Mapping | 🟠 Major |
-| #3 | 27 KPIs removed | KPI Mapping | 🟠 Major |
-| #4 | 4 duplicate KPI aliases | KPI Mapping | 🟡 Moderate |
-| #5 | App.tsx 1700+ lines | Code Quality | 🟡 Moderate |
-| #6 | Missing test coverage | Code Quality | 🟡 Moderate |
-| #7 | ADR-001 live-mode | Feature | 🟢 Queued |
-| #8 | ADR-002 RALPH loop | Feature | 🟢 Queued |
+| #1 | 2-board Pipedrive limitation | Pipedrive Data | ðŸ”´ Critical |
+| #2 | 3 roles with 0 KPIs | KPI Mapping | ðŸŸ  Major |
+| #3 | 27 KPIs removed | KPI Mapping | ðŸŸ  Major |
+| #4 | 4 duplicate KPI aliases | KPI Mapping | ðŸŸ¡ Moderate |
+| #5 | App.tsx 1700+ lines | Code Quality | ðŸŸ¡ Moderate |
+| #6 | Missing test coverage | Code Quality | ðŸŸ¡ Moderate |
+| #7 | ADR-001 live-mode | Feature | ðŸŸ¢ Queued |
+| #8 | ADR-002 RALPH loop | Feature | ðŸŸ¢ Queued |
 
