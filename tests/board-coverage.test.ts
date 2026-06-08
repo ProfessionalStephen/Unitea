@@ -1,17 +1,13 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { BOARDS } from "../shared/domain/boards.js";
 
-// ─────────────────────────────────────────────────────────────
 // BOARD COVERAGE
 //
-// Catches drift between the codebase's expected pipelines and
-// what Pipedrive actually has. The setup script (scripts/pipedrive-setup.ts)
-// is the producer; this test is the regression net.
-//
-// Pure-data test — does not hit the network. Run a mock /pipelines
-// response that represents the post-setup Pipedrive state.
-// In CI, this passes as long as the local BOARDS config matches.
-// ─────────────────────────────────────────────────────────────
+// ADR-003 makes live Pipedrive the source of truth. BOARDS is a strict
+// byte-for-byte mirror of that live state, including trailing spaces, casing
+// drift, and apparent typos. This pure-data test does not hit the network.
+// To detect live drift, run scripts/pipedrive-inspect.ts and update BOARDS
+// deliberately.
 
 describe("board coverage", () => {
   it("every BOARDS entry has a stage list (non-empty array)", () => {
@@ -30,17 +26,11 @@ describe("board coverage", () => {
     }
   });
 
-  it("BOARDS keys match the post-setup Pipedrive pipelines (mocked source-of-truth)", () => {
-    // This mock represents the state Pipedrive SHOULD be in after
-    // scripts/pipedrive-setup.ts has run successfully. The setup script
-    // creates one pipeline per BOARDS key. If a key is added to BOARDS
-    // without an entry in this set, future drift is caught here.
-    const expectedAfterSetup = new Set(Object.keys(BOARDS));
-
-    // Simulate a /pipelines response that mirrors BOARDS.
+  it("BOARDS keys are stable within the strict Pipedrive mirror", () => {
+    const expectedMirror = new Set(Object.keys(BOARDS));
     const pipedriveSimulated = Object.keys(BOARDS).map((name, i) => ({ id: i + 1, name }));
 
-    for (const expected of expectedAfterSetup) {
+    for (const expected of expectedMirror) {
       const found = pipedriveSimulated.find((p) => p.name === expected);
       expect(found, `Pipedrive missing pipeline: ${expected}`).toBeDefined();
     }

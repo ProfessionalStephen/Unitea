@@ -8,3 +8,5 @@ export * from "./boards.js";
 export * from "./roles.js";
 export * from "./team.js";
 export * from "./kpi-configs.js";
+export * from "./kpi-catalog.js";
+export * from "./role-assignments.js";

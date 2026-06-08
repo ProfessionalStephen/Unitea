@@ -2,7 +2,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import {
   BOARDS,
-  INDUSTRY_BENCHMARK_DAYS,
   RT,
   PERMISSIONS,
   canAccess,
@@ -14,6 +13,18 @@ import {
   PD_FIELDS_FLAT,
 } from "../shared/domain";
 import { resolveKpi, viewFromFrontend } from "../shared/kpi";
+import {
+  assembleEmail,
+  buildEmailHealthSection,
+  buildKpiTableHtml,
+  buildNeedsAttentionHtml,
+  buildPipelineData,
+  dlCSV,
+  dlJSON,
+  escHtml,
+  getPriorities,
+  todayStr,
+} from "./components/shared/helpers";
 import { mapPullResponse } from "./data/pull-response";
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -28,122 +39,6 @@ const C={orange:"#F28F1D",orangeDeep:"#D4721A",green:"#22C55E",amber:"#F59E0B",r
 const RANGES=["Week over week","Month over month","Quarter over quarter","Year over year"];
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// DATA MODEL â€” derived view of pipelineData; domain constants imported from ../shared/domain
-function buildPipelineData(liveApiData) {
-  var boardNames=Object.keys(BOARDS);
-  var boards={};
-  var totalActiveJobs=0;
-  var totalStuck=0;
-  var allDeals=[];
-
-  boardNames.forEach(function(bName) {
-    var cfg=BOARDS[bName];
-    var stages={};
-    var boardTotalJobs=0;
-    var boardTotalDays=0;
-    var boardStuck=0;
-
-    cfg.stages.forEach(function(sName) {
-      var threshold=cfg.rotting[sName]||null;
-      var liveStage=null;
-      if(liveApiData&&liveApiData.boardData&&liveApiData.boardData[bName]) {
-        var lb=liveApiData.boardData[bName];
-        liveStage=lb.stages?lb.stages.find(function(s){return s.name&&s.name.toLowerCase()===sName.toLowerCase();}):null;
-      }
-
-      // Only show stage data when it's real. No simulated jobCount/avgDays.
-      var jobCount=liveStage?liveStage.count:0;
-      var avgDays=liveStage?parseFloat(liveStage.avgDays):0;
-      var stageTotalValue=liveStage?parseFloat(liveStage.totalValue||0):0;
-      var deals=[];
-
-      if(liveStage&&liveStage.deals) {
-        deals=liveStage.deals.map(function(d) {
-          return {id:d.id,name:d.name||d.title||"Unknown",address:"",days:d.days,rep:d.ownerName||"Unassigned",pipedriveUrl:d.url||d.pipedriveUrl,notes:[],flags:d.days>(threshold||999)?["Past rotting threshold"]:[]};
-        });
-      }
-
-      var stuckCount=deals.filter(function(d){return threshold&&d.days>threshold;}).length;
-      boardTotalJobs+=jobCount;
-      boardTotalDays+=avgDays*jobCount;
-      boardStuck+=stuckCount;
-      deals.forEach(function(d){allDeals.push(Object.assign({},d,{board:bName,stage:sName}));});
-
-      stages[sName]={name:sName,jobCount:jobCount,avgDays:parseFloat(avgDays.toFixed(1)),threshold:threshold,stuckCount:stuckCount,totalValue:stageTotalValue,deals:deals};
-    });
-
-    var boardAvgDays=boardTotalJobs>0?parseFloat((boardTotalDays/boardTotalJobs).toFixed(1)):0;
-    var boardTotalValue=Object.values(stages).reduce(function(sum,s){return sum+(s.totalValue||0);},0);
-    // Status now derived from real stuck count vs total â€” not random
-    var stuckRatio=boardTotalJobs>0?boardStuck/boardTotalJobs:0;
-    var status=stuckRatio>=0.2?"red":stuckRatio>=0.05?"amber":"green";
-    totalActiveJobs+=boardTotalJobs;
-    totalStuck+=boardStuck;
-
-    boards[bName]={name:bName,region:cfg.region,jobCount:boardTotalJobs,avgDays:boardAvgDays,stuckCount:boardStuck,totalValue:boardTotalValue,status:status,stages:stages,live:!!(liveApiData&&liveApiData.boardData&&liveApiData.boardData[bName])};
-  });
-
-  // End-to-end: sum of board averages (only boards with deals)
-  var endToEndDays=Object.values(boards).reduce(function(sum,b){return sum+(b.jobCount>0?b.avgDays:0);},0);
-
-  // Bottleneck detection: stages where avgDays significantly exceeds the board's average
-  // Real definition: avgDays >= 1.5x board avg, minimum 7 days, must have at least 1 deal.
-  var bottlenecks=[];
-  Object.values(boards).forEach(function(b) {
-    if(b.jobCount===0||b.avgDays===0)return;
-    var threshold=Math.max(7,b.avgDays*1.5);
-    Object.values(b.stages).forEach(function(s) {
-      if(s.jobCount>0&&s.avgDays>=threshold) {
-        bottlenecks.push({
-          board:b.name,
-          stage:s.name,
-          stuckCount:s.jobCount,
-          avgDays:s.avgDays,
-          boardAvg:b.avgDays,
-          pctAbove:b.avgDays>0?Math.round(((s.avgDays-b.avgDays)/b.avgDays)*100):0
-        });
-      }
-    });
-  });
-  bottlenecks.sort(function(a,b){return b.pctAbove-a.pctAbove;});
-
-  // Rep stats from real allDeals data only (real owner names come from Pipedrive)
-  var repStats={};
-  allDeals.forEach(function(d) {
-    var rep=d.rep||"Unassigned";
-    if(!repStats[rep])repStats[rep]={rep:rep,jobCount:0,totalDays:0};
-    repStats[rep].jobCount++;
-    repStats[rep].totalDays+=d.days||0;
-  });
-  Object.values(repStats).forEach(function(r:any){
-    r.avgDays=r.jobCount>0?parseFloat((r.totalDays/r.jobCount).toFixed(1)):0;
-  });
-
-  // Pull aggregate fields from liveApiData (computed in api/_lib/pipedrive.ts)
-  var live=liveApiData||{};
-  return {
-    boards:boards,
-    totalActiveJobs:totalActiveJobs,
-    totalStuck:totalStuck,
-    endToEndDays:parseFloat(endToEndDays.toFixed(1)),
-    bottlenecks:bottlenecks,
-    repStats:repStats,
-    allDeals:allDeals,
-    isLive:!!liveApiData,
-    // Live aggregates (undefined when no live data â€” resolver falls back)
-    totalPipelineValue:live.totalPipelineValue,
-    wonThisWeek:live.wonThisWeek,
-    wonThisWeekValue:live.wonThisWeekValue,
-    wonLast30d:live.wonLast30d,
-    lostLast30d:live.lostLast30d,
-    lostLast30dValue:live.lostLast30dValue,
-    cancellationRate30d:live.cancellationRate30d,
-    activitiesDueToday:live.activitiesDueToday,
-    activitiesOverdue:live.activitiesOverdue,
-    callsDueToday:live.callsDueToday,
-  };
-}
-
 // PERMISSIONS, canAccess, RT, mB (boardsForRole), mK (kpisForRole),
 // TEAM_INIT, KPI_INIT all imported from ../shared/domain at top of file.
 
@@ -162,7 +57,6 @@ const RALPH_STAGES=[
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // PIPEDRIVE FETCH
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-function valKey(k){if(!k||k.length<20)return "Key too short";if(!/^[a-f0-9]+$/i.test(k))return "Invalid characters";return null;}
 async function fetchPD(_apiKey,setErr,setHealth){
   setErr(null);
   try{
@@ -189,221 +83,6 @@ function resolveKpiValue(tag, pd) {
   if (!tag) return "â€”";
   return resolveKpi(tag.name, tag, viewFromFrontend(pd));
 }
-
-// Build KPI table HTML from pipelineData â€” no AI, guaranteed layout
-function buildKpiTableHtml(person, pd, kpiTags, _liveApiData) {
-  var kpis = person.kpis.map(function(k) {
-    var tag = kpiTags.find(function(t) { return t.name === k; });
-    var val = tag ? resolveKpiValue(tag, pd) : "â€”";
-    return {name: k, val: val};
-  });
-
-  // Build rows of 3
-  var rows = "";
-  for (var i = 0; i < kpis.length; i += 3) {
-    var cells = "";
-    for (var j = i; j < Math.min(i + 3, kpis.length); j++) {
-      cells += "<td width='33%' style='padding:4px;'>"
-        + "<div style='background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:10px 12px;text-align:center;'>"
-        + "<p style='margin:0 0 4px;font-size:11px;color:#897C80;font-family:Arial,sans-serif;'>" + kpis[j].name + "</p>"
-        + "<p style='margin:0;font-size:18px;font-weight:500;color:#F0F0F0;font-family:Arial,sans-serif;'>" + kpis[j].val + "</p>"
-        + "</div></td>";
-    }
-    // Pad last row if odd
-    var remaining = (i + 3) - kpis.length;
-    if (remaining > 0 && remaining < 3) {
-      for (var p = 0; p < remaining; p++) cells += "<td width='33%' style='padding:4px;'></td>";
-    }
-    rows += "<tr>" + cells + "</tr>";
-  }
-  return "<table width='100%' cellpadding='0' cellspacing='0' border='0'>" + rows + "</table>";
-}
-
-// Build needs attention HTML from bottlenecks + AI text
-function buildNeedsAttentionHtml(alerts, pd) {
-  var rows = alerts.map(function(alert, i) {
-    var bn = pd.bottlenecks[i];
-    var pdUrl = bn ? "https://app.pipedrive.com/deals/?filter_id=" + encodeURIComponent(bn.board) : "https://app.pipedrive.com";
-    return "<div style='margin-bottom:8px;padding:10px 14px;background:rgba(239,68,68,0.07);border-left:3px solid #EF4444;border-radius:0 8px 8px 0;'>"
-      + "<p style='margin:0 0 4px;font-size:13px;color:#F0F0F0;font-family:Arial,sans-serif;'>" + alert + "</p>"
-      + "<a href='" + pdUrl + "' style='font-size:11px;color:#4A9EE0;text-decoration:none;font-family:Arial,sans-serif;'>View in Pipedrive &rarr;</a>"
-      + "</div>";
-  }).join("");
-  return rows;
-}
-
-// Master template assembler â€” fixed structure, no variation
-function assembleEmail(person, content, kpiTableHtml, needsAttentionHtml, boardHealthHtml, isMonday, isOwnerLevel) {
-  var divider = "<div style='height:1px;background:rgba(255,255,255,0.08);margin:0;'></div>";
-  var sectionStyle = "padding:18px 22px;background:#24262B;";
-  var headerStyle = "margin:0 0 12px;font-size:14px;font-weight:500;color:#F28F1D;font-family:Arial,sans-serif;";
-  var bodyStyle = "font-size:13px;color:#F0F0F0;font-family:Arial,sans-serif;line-height:1.6;";
-
-  var sections = [
-    // S1 â€” Greeting
-    "<div style='" + sectionStyle + "background:#1E2228;'>"
-    + "<p style='" + bodyStyle + "margin:0;'>" + (content.greeting || "") + "</p>"
-    + "</div>",
-
-    divider,
-
-    // S2 â€” KPIs (built entirely from data, no AI)
-    "<div style='" + sectionStyle + "'>"
-    + "<p style='" + headerStyle + "'>Your KPIs today</p>"
-    + kpiTableHtml
-    + "</div>",
-
-    divider,
-
-    // S3 â€” Needs attention (AI text + code-built links)
-    "<div style='" + sectionStyle + "background:#1E2228;'>"
-    + "<p style='" + headerStyle + "'>Needs attention</p>"
-    + needsAttentionHtml
-    + "</div>",
-
-    divider,
-
-    // S4 â€” Board health (built entirely from pipelineData, always here, always standalone)
-    person.nested ? boardHealthHtml : null,
-    person.nested ? divider : null,
-
-    // S5 â€” Today's priorities (AI text)
-    "<div style='" + sectionStyle + "'>"
-    + "<p style='" + headerStyle + "'>Today's priorities</p>"
-    + (content.priorities || []).map(function(p, i) {
-        return "<div style='display:flex;gap:10px;margin-bottom:8px;align-items:flex-start;'>"
-          + "<span style='font-size:13px;color:#F28F1D;font-family:Arial,sans-serif;font-weight:500;flex-shrink:0;'>" + (i+1) + ".</span>"
-          + "<p style='margin:0;font-size:13px;color:#F0F0F0;font-family:Arial,sans-serif;'>" + p + "</p>"
-          + "</div>";
-      }).join("")
-    + "</div>",
-
-    // S6 â€” Team pulse (owners only)
-    isOwnerLevel && content.teamPulse ? divider : null,
-    isOwnerLevel && content.teamPulse
-      ? "<div style='" + sectionStyle + "background:#1E2228;'>"
-        + "<p style='" + headerStyle + "'>Team pulse</p>"
-        + "<p style='margin:0;" + bodyStyle + "'>" + content.teamPulse + "</p>"
-        + "</div>"
-      : null,
-
-    // S7 â€” Week in review (Mondays)
-    isMonday && content.weekReview ? divider : null,
-    isMonday && content.weekReview
-      ? "<div style='" + sectionStyle + "'>"
-        + "<p style='" + headerStyle + "'>Week in review</p>"
-        + "<p style='margin:0;" + bodyStyle + "'>" + content.weekReview + "</p>"
-        + "</div>"
-      : null,
-
-    divider,
-
-    // Footer â€” hardcoded
-    "<div style='padding:14px 22px;background:#141618;text-align:center;'>"
-    + "<p style='margin:0 0 6px;font-size:11px;color:#897C80;font-family:Arial,sans-serif;'>"
-    + "<a href='mailto:ai@unicitysolar.com?subject=Snooze alert - " + person.name + "' style='color:#897C80;margin:0 8px;'>Snooze alerts</a>"
-    + "&middot;"
-    + "<a href='mailto:ai@unicitysolar.com?subject=KPI Report - " + person.name + "' style='color:#897C80;margin:0 8px;'>Flag an issue</a>"
-    + "</p>"
-    + "<p style='margin:0;font-size:11px;color:#4A5568;font-family:Arial,sans-serif;'>Read-only system &middot; Unicity Solar Energy &middot; " + new Date().toLocaleDateString() + "</p>"
-    + "</div>",
-  ].filter(function(s) { return s !== null && s !== undefined; });
-
-  return "<div style='max-width:600px;margin:0 auto;background:#24262B;border-radius:12px;overflow:hidden;border:1px solid rgba(242,143,29,0.2);'>"
-    + sections.join("")
-    + "</div>";
-}
-
-// Escape HTML special chars to prevent injection in email body.
-function escHtml(s){
-  if(s===null||s===undefined)return "";
-  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
-}
-
-// Role-aware default priorities. Deterministic â€” no AI needed.
-function getPriorities(person,pd){
-  var stuck=pd.totalStuck||0;
-  var role=(person.role||"").toLowerCase();
-  var base=[];
-  if(role.indexOf("owner")>=0||role.indexOf("ceo")>=0||role.indexOf("coo")>=0||role.indexOf("vp")>=0){
-    base=[
-      "Review top 3 bottlenecks with relevant managers",
-      stuck>0?("Address "+stuck+" stuck deals across all boards"):"Maintain current pipeline velocity",
-      "Check team workload distribution"
-    ];
-  }else if(role.indexOf("sales")>=0){
-    base=["Follow up on stale leads (>14 days no activity)","Review weekly conversion metrics","Coordinate with Installation on hand-off readiness"];
-  }else if(role.indexOf("install")>=0||role.indexOf("warehouse")>=0||role.indexOf("operations")>=0){
-    base=["Confirm today's installation schedule","Check material availability for next 5 jobs","Review safety/permit status for active jobs"];
-  }else if(role.indexOf("finance")>=0){
-    base=["Review M1/M2/M3 invoice status","Reconcile prior week payments","Flag any aging receivables >30 days"];
-  }else if(role.indexOf("engineer")>=0||role.indexOf("design")>=0){
-    base=["Review pending design queue","Address engineering revisions","Coordinate utility submission status"];
-  }else{
-    base=["Review your KPIs above","Address items in 'Needs attention'","Coordinate with your manager on blockers"];
-  }
-  return base;
-}
-
-// Build standalone board health block injected into preview emails for nested-access roles.
-// Uses pipelineData directly â€” no AI.
-function buildEmailHealthSection(pd, memberBoards) {
-  var boards=(memberBoards||[]).filter(function(b){return pd.boards[b];});
-  var sorted=boards.slice().sort(function(a,b){var o={red:0,amber:1,green:2};var sa=pd.boards[a]?pd.boards[a].status:"green";var sb=pd.boards[b]?pd.boards[b].status:"green";return(o[sa]||2)-(o[sb]||2);});
-  var gc=boards.filter(function(b){return pd.boards[b]&&pd.boards[b].status==="green";}).length;
-  var ac=boards.filter(function(b){return pd.boards[b]&&pd.boards[b].status==="amber";}).length;
-  var rc=boards.filter(function(b){return pd.boards[b]&&pd.boards[b].status==="red";}).length;
-  var top3=pd.bottlenecks.slice(0,3);
-
-  var boardCards=sorted.map(function(bName){
-    var b=pd.boards[bName];if(!b)return"";
-    var col=b.status==="green"?"#22C55E":b.status==="amber"?"#F59E0B":"#EF4444";
-    var icon=b.status==="green"?"&#9679;":b.status==="amber"?"&#9650;":"&#10005;";
-    var topStage=Object.values(b.stages).sort(function(a,b){return b.stuckCount-a.stuckCount;})[0];
-    var stageInfo=topStage&&topStage.stuckCount>0?"Top stuck: "+topStage.name+" ("+topStage.stuckCount+" deals, avg "+topStage.avgDays+"d)":"No stuck jobs";
-    return "<div style='width:100%;margin-bottom:7px;'>"
-      +"<details style='border-radius:8px;overflow:hidden;border:1px solid "+col+"40;'>"
-      +"<summary style='padding:10px 14px;background:"+col+"15;cursor:pointer;list-style:none;font-family:Arial,sans-serif;'>"
-      +"<table width='100%' cellpadding='0' cellspacing='0' border='0'><tr>"
-      +"<td style='color:"+col+";font-size:13px;font-weight:500;'>"+icon+" "+bName+" &mdash; "+b.jobCount+" jobs</td>"
-      +"<td style='text-align:right;color:"+col+";font-size:11px;'>"+b.avgDays+"d avg &middot; "+b.stuckCount+" stuck &#9662;</td>"
-      +"</tr></table></summary>"
-      +"<div style='padding:10px 14px;background:#1E2228;font-family:Arial,sans-serif;'>"
-      +"<p style='margin:0 0 5px;font-size:11px;color:#897C80;'>"+stageInfo+"</p>"
-      +"<p style='margin:0;font-size:11px;color:#897C80;'>Avg days in board: "+b.avgDays+"d &middot; "+b.jobCount+" jobs &middot; "+b.stuckCount+" past rotting threshold</p>"
-      +"</div></details></div>";
-  }).join("");
-
-  var bottleneckRows=top3.map(function(bn){
-    return "<tr><td style='padding:5px 8px;font-size:11px;color:#F0F0F0;font-family:Arial,sans-serif;'>"+bn.board+"</td>"
-      +"<td style='padding:5px 8px;font-size:11px;color:#897C80;font-family:Arial,sans-serif;'>"+bn.stage+"</td>"
-      +"<td style='padding:5px 8px;font-size:11px;color:#EF4444;font-family:Arial,sans-serif;text-align:right;'>"+bn.avgDays+"d ("+bn.pctAbove+"% above avg)</td></tr>";
-  }).join("");
-
-  var sumRow="<table width='100%' cellpadding='0' cellspacing='0' border='0' style='margin-bottom:14px;'><tr>"
-    +"<td width='32%' style='text-align:center;padding:9px 6px;background:rgba(34,197,94,0.1);border-radius:8px;border:1px solid rgba(34,197,94,0.25);'><p style='margin:0;font-size:20px;font-weight:500;color:#22C55E;font-family:Arial,sans-serif;'>"+gc+"</p><p style='margin:3px 0 0;font-size:11px;color:#22C55E;font-family:Arial,sans-serif;'>&#9679; Healthy</p></td>"
-    +"<td width='4%'></td>"
-    +"<td width='28%' style='text-align:center;padding:9px 6px;background:rgba(245,158,11,0.1);border-radius:8px;border:1px solid rgba(245,158,11,0.25);'><p style='margin:0;font-size:20px;font-weight:500;color:#F59E0B;font-family:Arial,sans-serif;'>"+ac+"</p><p style='margin:3px 0 0;font-size:11px;color:#F59E0B;font-family:Arial,sans-serif;'>&#9650; Watch</p></td>"
-    +"<td width='4%'></td>"
-    +"<td width='32%' style='text-align:center;padding:9px 6px;background:rgba(239,68,68,0.1);border-radius:8px;border:1px solid rgba(239,68,68,0.25);'><p style='margin:0;font-size:20px;font-weight:500;color:#EF4444;font-family:Arial,sans-serif;'>"+rc+"</p><p style='margin:3px 0 0;font-size:11px;color:#EF4444;font-family:Arial,sans-serif;'>&#10005; Critical</p></td>"
-    +"</tr></table>";
-
-  return "<div style='margin:0;padding:18px 22px;background:#1A1D22;border-top:1px solid rgba(255,255,255,0.08);border-bottom:1px solid rgba(255,255,255,0.08);'>"
-    +"<p style='margin:0 0 12px;font-size:15px;font-weight:500;color:#F28F1D;font-family:Arial,sans-serif;'>Board health overview</p>"
-    +sumRow
-    +"<div style='width:100%;margin-bottom:14px;'>"+boardCards+"</div>"
-    +(top3.length>0?"<p style='margin:0 0 7px;font-size:12px;font-weight:500;color:#F28F1D;font-family:Arial,sans-serif;'>Top bottlenecks this period</p>"
-    +"<table width='100%' cellpadding='0' cellspacing='0' border='0' style='background:rgba(239,68,68,0.06);border-radius:8px;border:1px solid rgba(239,68,68,0.2);'>"+bottleneckRows+"</table>":"")
-    +"<p style='margin:10px 0 0;font-size:11px;color:#897C80;text-align:center;font-family:Arial,sans-serif;'>End-to-end pipeline avg: "+pd.endToEndDays+" days &middot; Industry benchmark: "+INDUSTRY_BENCHMARK_DAYS+" days</p>"
-    +"</div>";
-}
-
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// DOWNLOAD HELPERS
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-function dlCSV(data,fn){if(!data.length)return;var k=Object.keys(data[0]);var csv=[k.join(",")].concat(data.map(function(r){return k.map(function(key){return '"'+(String(r[key]||"")).replace(/"/g,'""')+'"';}).join(",");})).join("\n");var a=document.createElement("a");a.href="data:text/csv;charset=utf-8,"+encodeURIComponent(csv);a.download=fn;a.click();}
-function dlJSON(data,fn){var a=document.createElement("a");a.href="data:application/json;charset=utf-8,"+encodeURIComponent(JSON.stringify(data,null,2));a.download=fn;a.click();}
-function todayStr(){return new Date().toISOString().split("T")[0];}
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // UI ATOMS

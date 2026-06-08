@@ -30,11 +30,36 @@ export const KPI_INIT: KpiTag[] = [
   { id: "k10", name: "Cancellation rate",        sources: [], fallback: "N/A", testResult: null },
   { id: "k11", name: "Pipeline value",           sources: [], fallback: "N/A", testResult: null }, // aggregate alias
   { id: "k12", name: "Funding pipeline value",   sources: [{ board: "Funding", scope: "board", stage: null, field: "deal.value" }], fallback: "N/A", testResult: null },
-  { id: "k13", name: "Pipeline deals active",    sources: [], fallback: "0",   testResult: null }, // aggregate alias of totalActiveJobs
-  { id: "k14", name: "Net metering backlog",     sources: [{ board: "Net Metering", scope: "board", stage: null, field: "pipeline.deal_count" }], fallback: "0", testResult: null },
+  // Retired aliases handled by KpiCatalog: "Pipeline deals active" -> "Total active jobs",
+  // "Net metering backlog" -> "Net metering pending".
   { id: "k15", name: "Net metering pending",     sources: [{ board: "Net Metering", scope: "board", stage: null, field: "pipeline.deal_count" }], fallback: "0", testResult: null },
   { id: "k16", name: "R&R jobs active",          sources: [{ board: "R&R ", scope: "board", stage: null, field: "pipeline.deal_count" }], fallback: "0", testResult: null },
   { id: "k17", name: "Pending inspections",      sources: [{ board: "Inspection", scope: "board", stage: null, field: "pipeline.deal_count" }], fallback: "0", testResult: null },
+
+  // Resolver-backed aggregates and aliases.
+  { id: "k200", name: "Avg days to install",      sources: [], fallback: "N/A", testResult: null },
+  { id: "k201", name: "Avg days per stage",       sources: [], fallback: "N/A", testResult: null },
+  { id: "k202", name: "Welcome calls due today",  sources: [], fallback: "N/A", testResult: null },
+  { id: "k203", name: "Thank you calls due",      sources: [], fallback: "N/A", testResult: null },
+  { id: "k204", name: "Welcome calls due",        sources: [], fallback: "N/A", testResult: null },
+  { id: "k205", name: "Welcome calls completed",  sources: [], fallback: "N/A", testResult: null },
+  { id: "k206", name: "Welcome calls pending",    sources: [], fallback: "N/A", testResult: null },
+  { id: "k207", name: "Overdue activities",       sources: [], fallback: "N/A", testResult: null },
+  { id: "k208", name: "Board health overview",    sources: [], fallback: "N/A", testResult: null },
+  { id: "k209", name: "KPI coverage rate",        sources: [], fallback: "N/A", testResult: null },
+  { id: "k210", name: "Unmapped KPI tags",        sources: [], fallback: "N/A", testResult: null },
+  { id: "k211", name: "M1/M2/M3 invoice status",  sources: [], fallback: "N/A", testResult: null },
+  { id: "k212", name: "New deals this week",      sources: [], fallback: "N/A", testResult: null },
+  { id: "k213", name: "Installs completed",       sources: [], fallback: "N/A", testResult: null },
+  { id: "k214", name: "Funded this week",         sources: [], fallback: "N/A", testResult: null },
+  { id: "k215", name: "Installs completed yesterday", sources: [], fallback: "N/A", testResult: null },
+  { id: "k216", name: "Installs scheduled this week", sources: [], fallback: "N/A", testResult: null },
+  { id: "k217", name: "Permits submitted this week", sources: [], fallback: "N/A", testResult: null },
+  { id: "k218", name: "Sent to permitting today", sources: [], fallback: "N/A", testResult: null },
+  { id: "k219", name: "NMA submitted this week", sources: [], fallback: "N/A", testResult: null },
+  { id: "k220", name: "Service requests today",  sources: [], fallback: "N/A", testResult: null },
+  { id: "k221", name: "Technicians scheduled today", sources: [], fallback: "N/A", testResult: null },
+  { id: "k222", name: "Inspections scheduled today", sources: [], fallback: "N/A", testResult: null },
 
   // Stage-bound mappings — Engineering
   { id: "k5",  name: "Ready for engineering",    sources: [{ board: "Engineering", scope: "stage", stage: "Ready for Engineering ", field: "stage.deal_count" }], fallback: "0", testResult: null },
@@ -48,10 +73,10 @@ export const KPI_INIT: KpiTag[] = [
   // Scheduling/Coordinating
   { id: "k6",  name: "Installs scheduled today", sources: [{ board: "Scheduling/Coordinating", scope: "stage", stage: "Installation Scheduled", field: "stage.deal_count" }], fallback: "0", testResult: null },
   { id: "k30", name: "Install not completed",    sources: [{ board: "Scheduling/Coordinating", scope: "stage", stage: "Install not completed", field: "stage.deal_count" }], fallback: "0", testResult: null },
-  { id: "k31", name: "Material ordered pending", sources: [{ board: "Scheduling/Coordinating", scope: "stage", stage: "Material Ordered", field: "stage.deal_count" }], fallback: "0", testResult: null },
+  // Retired alias handled by KpiCatalog: "Material ordered pending" -> "Material orders pending".
   { id: "k32", name: "Material orders pending",  sources: [{ board: "Scheduling/Coordinating", scope: "stage", stage: "Material Ordered", field: "stage.deal_count" }], fallback: "0", testResult: null },
   { id: "k33", name: "HOA approvals pending",    sources: [{ board: "Scheduling/Coordinating", scope: "stage", stage: "Pending HOA Approvals", field: "stage.deal_count" }], fallback: "0", testResult: null },
-  { id: "k34", name: "HOA pending approvals",    sources: [{ board: "Scheduling/Coordinating", scope: "stage", stage: "Pending HOA Approvals", field: "stage.deal_count" }], fallback: "0", testResult: null },
+  // Retired alias handled by KpiCatalog: "HOA pending approvals" -> "HOA approvals pending".
 
   // Service
   { id: "k7",  name: "Service tickets open",     sources: [{ board: "Service Board", scope: "board", stage: null, field: "pipeline.deal_count" }], fallback: "0", testResult: null },
