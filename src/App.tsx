@@ -325,6 +325,9 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
     {sub==="Overview"&&<div>
       {pd.isLive&&<div style={{background:C.green+"0d",border:"1px solid "+C.green+"22",borderRadius:10,padding:"7px 12px",marginBottom:"1rem"}}>
         <span style={{fontSize:12,color:C.green}}>Live Pipedrive data &middot; {pd.totalActiveJobs} active jobs &middot; {pd.totalStuck} stuck</span>
+        {pd.unmappedActiveJobs>0&&<div style={{marginTop:4,fontSize:11,color:C.amber}}>
+          {pd.unmappedActiveJobs} active jobs are outside the configured board mirror and will not appear in board drilldowns yet.
+        </div>}
       </div>}
 
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:8,marginBottom:"1rem"}}>

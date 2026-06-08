@@ -25,6 +25,9 @@ type RawBoard = {
 
 type LiveApiData = {
   boardData?: Record<string, RawBoard>;
+  totalActiveJobs?: number;
+  totalDeals?: number;
+  stalled?: unknown[];
   totalPipelineValue?: number;
   wonThisWeek?: number;
   wonThisWeekValue?: number;
@@ -163,6 +166,8 @@ type EmailContent = {
 export type PipelineDataView = {
   boards: Record<string, BoardView>;
   totalActiveJobs: number;
+  configuredActiveJobs: number;
+  unmappedActiveJobs: number;
   totalStuck: number;
   endToEndDays: number;
   bottlenecks: BottleneckView[];
@@ -360,10 +365,17 @@ export function buildPipelineData(liveApiData?: LiveApiData | null): PipelineDat
   }
 
   const live = liveApiData || {};
+  const configuredActiveJobs = totalActiveJobs;
+  const apiActiveJobs = Number(live.totalActiveJobs ?? live.totalDeals);
+  const apiStuck = Array.isArray(live.stalled) ? live.stalled.length : NaN;
   return {
     boards,
-    totalActiveJobs,
-    totalStuck,
+    totalActiveJobs: Number.isFinite(apiActiveJobs) ? apiActiveJobs : configuredActiveJobs,
+    configuredActiveJobs,
+    unmappedActiveJobs: Number.isFinite(apiActiveJobs)
+      ? Math.max(0, apiActiveJobs - configuredActiveJobs)
+      : 0,
+    totalStuck: Number.isFinite(apiStuck) ? apiStuck : totalStuck,
     endToEndDays: Number.parseFloat(endToEndDays.toFixed(1)),
     bottlenecks,
     repStats,

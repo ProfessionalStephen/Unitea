@@ -57,6 +57,42 @@ describe("buildPipelineData", () => {
     expect(out.callsDueToday).toBe(2);
   });
 
+  it("uses Pipedrive aggregates for top-level active and stuck counts", () => {
+    const out = buildPipelineData({
+      boardData: {
+        Engineering: {
+          stages: [
+            {
+              name: "Ready for Engineering ",
+              count: 2,
+              avgDays: "4",
+              totalValue: "30000",
+              deals: [],
+            },
+          ],
+        },
+        "Deal Tracking": {
+          stages: [
+            {
+              name: "Active",
+              count: 25,
+              avgDays: "6",
+              totalValue: "250000",
+              deals: [],
+            },
+          ],
+        },
+      },
+      totalActiveJobs: 27,
+      stalled: [{ dealId: 101 }],
+    });
+
+    expect(out.totalActiveJobs).toBe(27);
+    expect(out.totalStuck).toBe(1);
+    expect(out.configuredActiveJobs).toBe(2);
+    expect(out.unmappedActiveJobs).toBe(25);
+  });
+
   it("zero-fills configured boards that are absent from live data", () => {
     const out = buildPipelineData({ boardData: {} });
 
