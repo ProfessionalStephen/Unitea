@@ -16,12 +16,13 @@ import {
 import { resolveKpi, viewFromFrontend } from "../shared/kpi";
 import { mapPullResponse } from "./data/pull-response";
 import { BarChart, LineChart, DonutChart } from "./charts";
+import { chartColors } from "./chart-utils";
 import { OPS_INSIGHTS } from "./data/ops-insights";
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // THEME
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-const DARK={bg:"#1A1C20",card:"rgba(46,49,56,0.9)",cardSolid:"#2E3138",border:"rgba(242,143,29,0.18)",borderPlain:"rgba(255,255,255,0.08)",text:"#F0F0F0",textMuted:"#897C80",inputBg:"rgba(255,255,255,0.06)",inputBorder:"rgba(242,143,29,0.25)",tabBg:"rgba(255,255,255,0.04)",tabBorder:"rgba(255,255,255,0.07)",selectText:"#F0F0F0",selectBg:"#2E3138"};
+const DARK={bg:"#1A1C20",card:"rgba(46,49,56,0.9)",cardSolid:"#2E3138",border:"rgba(242,143,29,0.18)",borderPlain:"rgba(255,255,255,0.08)",text:"#F0F0F0",textMuted:"#A39A92",inputBg:"rgba(255,255,255,0.06)",inputBorder:"rgba(242,143,29,0.25)",tabBg:"rgba(255,255,255,0.04)",tabBorder:"rgba(255,255,255,0.07)",selectText:"#F0F0F0",selectBg:"#2E3138"};
 const LIGHT={bg:"#F0F0F0",card:"rgba(232,232,232,0.95)",cardSolid:"#E8E8E8",border:"rgba(242,143,29,0.3)",borderPlain:"rgba(36,38,43,0.12)",text:"#24262B",textMuted:"#5A5A5A",inputBg:"rgba(36,38,43,0.06)",inputBorder:"rgba(242,143,29,0.4)",tabBg:"rgba(36,38,43,0.05)",tabBorder:"rgba(36,38,43,0.1)",selectText:"#24262B",selectBg:"#E8E8E8"};
 const C={orange:"#F28F1D",orangeDeep:"#D4721A",green:"#22C55E",amber:"#F59E0B",red:"#EF4444",blue:"#1D6FB5",purple:"#A855F7"};
 
@@ -1026,6 +1027,7 @@ function KpiMapping({kpiTags,setKpiTags,team,th,pd,kpiCfgState,onSaveKpiConfig})
 function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string}}){
   var [dark,setDark]=useState(true);
   var th=dark?DARK:LIGHT;
+  var cc=chartColors(dark);   // theme-aware, gate-verified chart/RAG palette
   var glass={background:th.card,border:"1px solid "+th.border,borderRadius:16,padding:"1.25rem"};
   var iS={background:th.inputBg,border:"1px solid "+th.inputBorder,borderRadius:10,color:th.selectText,fontSize:13,padding:"8px 11px",outline:"none",fontFamily:"inherit",boxSizing:"border-box" as const};
 
@@ -1600,16 +1602,16 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:"1rem",flexWrap:"wrap"}}>
         <p style={{margin:0,fontSize:13,color:th.textMuted,flex:1}}>Visual KPI reports. Live pipeline from Pipedrive; operational insights from the notes-extraction pipeline.</p>
         <span style={{fontSize:11,color:th.textMuted,background:th.inputBg,border:"1px solid "+th.borderPlain,borderRadius:20,padding:"4px 10px"}}><i className="ti ti-clock" style={{fontSize:12,marginRight:4}} aria-hidden="true"/>Insights through {OPS_INSIGHTS.dataFreshThrough}</span>
-        <button onClick={function(){dlCSV(OPS_INSIGHTS.redFlags.categories.map(function(c){return {category:c.category,count:c.count};}),"red-flag-categories-"+todayStr()+".csv");}} style={{display:"flex",alignItems:"center",gap:5,background:th.inputBg,border:"1px solid "+th.borderPlain,borderRadius:20,padding:"5px 12px",color:th.textMuted,fontSize:11,cursor:"pointer"}}><i className="ti ti-download" style={{fontSize:13}} aria-hidden="true"/>Export CSV</button>
+        <button onClick={function(){dlCSV(OPS_INSIGHTS.redFlags.categories.map(function(c){return {category:c.category,count:c.count};}),"red-flag-categories-"+todayStr()+".csv");}} style={{display:"flex",alignItems:"center",gap:5,background:th.inputBg,border:"1px solid "+th.borderPlain,borderRadius:20,padding:"7px 14px",color:th.textMuted,fontSize:11,cursor:"pointer"}}><i className="ti ti-download" style={{fontSize:13}} aria-hidden="true"/>Export CSV</button>
       </div>
 
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:8,marginBottom:"1rem"}}>
         {[
           {l:"Total jobs",v:OPS_INSIGHTS.funnel.totalJobs.toLocaleString(),c:th.text,s:OPS_INSIGHTS.records.toLocaleString()+" extracted"},
-          {l:"Win rate (resolved)",v:OPS_INSIGHTS.funnel.winRate+"%",c:OPS_INSIGHTS.funnel.winRate>=70?C.green:C.amber,s:OPS_INSIGHTS.funnel.resolved.toLocaleString()+" resolved"},
-          {l:"Cancellation rate",v:OPS_INSIGHTS.cancellations.ratePctOfResolved+"%",c:OPS_INSIGHTS.cancellations.ratePctOfResolved>30?C.red:OPS_INSIGHTS.cancellations.ratePctOfResolved>15?C.amber:C.green,s:"median "+OPS_INSIGHTS.cancellations.medianDaysToCancel+"d to cancel"},
-          {l:"Inspection fail rate",v:OPS_INSIGHTS.inspections.failRatePct+"%",c:OPS_INSIGHTS.inspections.failRatePct>30?C.red:OPS_INSIGHTS.inspections.failRatePct>15?C.amber:C.green,s:OPS_INSIGHTS.inspections.failures.toLocaleString()+" of "+OPS_INSIGHTS.inspections.events.toLocaleString()},
-          {l:"Clawback at risk",v:OPS_INSIGHTS.clawbackAtRisk.toLocaleString(),c:C.red,s:"jobs flagged"},
+          {l:"Win rate (resolved)",v:OPS_INSIGHTS.funnel.winRate+"%",c:OPS_INSIGHTS.funnel.winRate>=70?cc.green:cc.amber,s:OPS_INSIGHTS.funnel.resolved.toLocaleString()+" resolved"},
+          {l:"Cancellation rate",v:OPS_INSIGHTS.cancellations.ratePctOfResolved+"%",c:OPS_INSIGHTS.cancellations.ratePctOfResolved>30?cc.red:OPS_INSIGHTS.cancellations.ratePctOfResolved>15?cc.amber:cc.green,s:"median "+OPS_INSIGHTS.cancellations.medianDaysToCancel+"d to cancel"},
+          {l:"Inspection fail rate",v:OPS_INSIGHTS.inspections.failRatePct+"%",c:OPS_INSIGHTS.inspections.failRatePct>30?cc.red:OPS_INSIGHTS.inspections.failRatePct>15?cc.amber:cc.green,s:OPS_INSIGHTS.inspections.failures.toLocaleString()+" of "+OPS_INSIGHTS.inspections.events.toLocaleString()},
+          {l:"Clawback at risk",v:OPS_INSIGHTS.clawbackAtRisk.toLocaleString(),c:cc.red,s:"jobs flagged"},
         ].map(function(card,i){return <div key={i} style={Object.assign({},glass,{padding:"0.9rem 1rem"})}>
           <p style={{margin:"0 0 5px",fontSize:11,color:th.textMuted}}>{card.l}</p>
           <p style={{margin:0,fontSize:23,fontWeight:600,color:card.c}}>{card.v}</p>
@@ -1621,43 +1623,43 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
         <div style={glass}>
           <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Red-flag categories</p>
           <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>{OPS_INSIGHTS.redFlags.total.toLocaleString()} flags across {OPS_INSIGHTS.redFlags.records.toLocaleString()} jobs</p>
-          <BarChart th={th} color={C.red} data={OPS_INSIGHTS.redFlags.categories.map(function(c){return {label:c.category.replace(/_/g," "),value:c.count};})}/>
+          <BarChart th={th} color={cc.red} data={OPS_INSIGHTS.redFlags.categories.map(function(c){return {label:c.category.replace(/_/g," "),value:c.count};})}/>
         </div>
 
         <div style={glass}>
           <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Job outcomes</p>
           <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>All jobs by current lifecycle phase</p>
-          <DonutChart th={th} data={OPS_INSIGHTS.funnel.outcomes.map(function(o,i){return {label:o.label,value:o.count,color:[C.blue,C.green,"#1d9e75",C.red,C.amber,th.textMuted][i]};})}/>
+          <DonutChart th={th} data={OPS_INSIGHTS.funnel.outcomes.map(function(o,i){return {label:o.label,value:o.count,color:[cc.blue,cc.green,cc.teal,cc.red,cc.amber,cc.neutral][i]};})}/>
         </div>
 
         <div style={glass}>
           <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Cycle times (median days)</p>
           <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Days between milestones</p>
-          <BarChart th={th} color={C.blue} format="days" data={OPS_INSIGHTS.cycleTimes.filter(function(c){return c.median!=null;}).map(function(c){return {label:c.label,value:c.median};})}/>
+          <BarChart th={th} color={cc.blue} format="days" data={OPS_INSIGHTS.cycleTimes.filter(function(c){return c.median!=null;}).map(function(c){return {label:c.label,value:c.median};})}/>
         </div>
 
         <div style={glass}>
           <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Where jobs cancel</p>
           <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Stage when cancelled (% of cancellations)</p>
-          <BarChart th={th} color={C.red} format="pct" data={OPS_INSIGHTS.cancellations.where.map(function(w){return {label:w.board,value:w.pct};})}/>
+          <BarChart th={th} color={cc.red} format="pct" data={OPS_INSIGHTS.cancellations.where.map(function(w){return {label:w.board,value:w.pct};})}/>
         </div>
 
         <div style={glass}>
           <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>How long before cancelling</p>
           <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Age at cancellation (% of cancellations)</p>
-          <BarChart th={th} color={C.amber} format="pct" data={OPS_INSIGHTS.cancellations.ageBuckets.map(function(a){return {label:a.label,value:a.pct};})}/>
+          <BarChart th={th} color={cc.amber} format="pct" data={OPS_INSIGHTS.cancellations.ageBuckets.map(function(a){return {label:a.label,value:a.pct};})}/>
         </div>
 
         <div style={glass}>
           <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Active jobs by board {pd.isLive?"":"(simulated)"}</p>
           <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Live pipeline &middot; {pd.totalActiveJobs} active jobs</p>
-          <BarChart th={th} color={C.orange} data={Object.keys(pd.boards).map(function(b){return {label:b,value:pd.boards[b].jobCount};}).filter(function(d){return d.value>0;}).sort(function(a,b){return b.value-a.value;}).slice(0,10)}/>
+          <BarChart th={th} color={cc.orange} data={Object.keys(pd.boards).map(function(b){return {label:b,value:pd.boards[b].jobCount};}).filter(function(d){return d.value>0;}).sort(function(a,b){return b.value-a.value;}).slice(0,10)}/>
         </div>
 
         <div style={Object.assign({},glass,{gridColumn:"1/-1"})}>
           <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Cancellations per month</p>
           <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Trend over time</p>
-          <LineChart th={th} color={C.orange} data={OPS_INSIGHTS.cancellations.monthly.map(function(m){return {label:m.month.slice(2),value:m.count};})}/>
+          <LineChart th={th} color={cc.orange} data={OPS_INSIGHTS.cancellations.monthly.map(function(m){return {label:m.month.slice(2),value:m.count};})}/>
         </div>
       </div>
     </div>}

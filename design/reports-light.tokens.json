@@ -1,0 +1,18 @@
+{ "name":"unitea-reports","theme":"light",
+  "checks":[
+    {"label":"muted text on card","fg":"#5A5A5A","bg":"#E8E8E8","kind":"text"},
+    {"label":"card value on card","fg":"#24262B","bg":"#E8E8E8","kind":"text"},
+    {"label":"RAG green (large)","fg":"#2E7D33","bg":"#E8E8E8","kind":"large"},
+    {"label":"RAG amber (large)","fg":"#8A5A00","bg":"#E8E8E8","kind":"large"},
+    {"label":"RAG red (large)","fg":"#B22B2B","bg":"#E8E8E8","kind":"large"},
+    {"label":"fill blue (ui)","fg":"#185FA5","bg":"#E8E8E8","kind":"ui"},
+    {"label":"fill red (ui)","fg":"#B22B2B","bg":"#E8E8E8","kind":"ui"},
+    {"label":"fill green (ui)","fg":"#2E7D33","bg":"#E8E8E8","kind":"ui"},
+    {"label":"fill amber (ui)","fg":"#8A5A00","bg":"#E8E8E8","kind":"ui"},
+    {"label":"fill teal (ui)","fg":"#0F6E56","bg":"#E8E8E8","kind":"ui"},
+    {"label":"fill orange (ui)","fg":"#B5491A","bg":"#E8E8E8","kind":"ui"},
+    {"label":"fill neutral (ui)","fg":"#5F5E5A","bg":"#E8E8E8","kind":"ui"}
+  ],
+  "targets":[{"label":"Export CSV button","px":27}],
+  "roles":{"ok":"#2E7D33","warn":"#8A5A00","danger":"#B22B2B","info":"#185FA5","neutral":"#5F5E5A"}
+}
