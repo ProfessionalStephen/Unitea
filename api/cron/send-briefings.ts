@@ -337,7 +337,7 @@ function buildEmail(person: TeamMember, pd: any, dataSource: string, kpiConfigs:
     <div style="padding:16px 24px;background:#1F2125;text-align:center;border-top:1px solid rgba(255,255,255,0.06);">
       <a href="${DASHBOARD_URL}" style="display:inline-block;background:linear-gradient(135deg,#F28F1D,#D4721A);color:#fff;padding:8px 18px;border-radius:6px;text-decoration:none;font-weight:500;font-size:13px;">Open dashboard &rarr;</a>
       <div style="margin-top:10px;font-size:10px;color:#6B6266;line-height:1.4;">
-        Unicity Solar Energy &middot; ${dataSource === "live" ? "Live Pipedrive snapshot" : "Data unavailable"} &middot; ${new Date().toLocaleString("en-US", { timeZone: "America/New_York" })} ET<br>
+        Unicity Solar Energy &middot; ${dataSource === "live" ? "Live Pipedrive snapshot" : "Data unavailable"} &middot; ${new Date().toLocaleString("en-GB", { timeZone: "America/New_York" })} ET<br>
         Read-only system. Numbers update each weekday at 7am EDT (6am EST).
       </div>
     </div>`;
