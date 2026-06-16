@@ -28,9 +28,10 @@ function nextRunIso(): string {
 
 function formatEasternLabel(iso: string): string {
   const d = new Date(iso);
-  return d.toLocaleString("en-US", {
+  // en-GB => day-first ("Mon 16 Jun, 06:00") to match the dashboard's DD/MM/YYYY convention.
+  return d.toLocaleString("en-GB", {
     timeZone: "America/New_York",
-    weekday: "short", month: "short", day: "numeric",
+    weekday: "short", day: "numeric", month: "short",
     hour: "numeric", minute: "2-digit", hour12: true,
   }) + " ET";
 }
