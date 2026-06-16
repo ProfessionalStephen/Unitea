@@ -15,6 +15,8 @@ import {
 } from "../shared/domain";
 import { resolveKpi, viewFromFrontend } from "../shared/kpi";
 import { mapPullResponse } from "./data/pull-response";
+import { BarChart, LineChart, DonutChart } from "./charts";
+import { OPS_INSIGHTS } from "./data/ops-insights";
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // THEME
@@ -1394,7 +1396,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
     }
   }
 
-  var ALL_TABS=[{id:"Setup",icon:"ti-settings",admin:true},{id:"Team",icon:"ti-users",admin:false},{id:"Boards",icon:"ti-layout-board",admin:false},{id:"Intelligence",icon:"ti-brain",admin:false},{id:"Preview",icon:"ti-mail",admin:false},{id:"Send",icon:"ti-send",admin:true},{id:"Audit",icon:"ti-history",admin:true},{id:"RALPH",icon:"ti-circuit-board",admin:true}];
+  var ALL_TABS=[{id:"Setup",icon:"ti-settings",admin:true},{id:"Team",icon:"ti-users",admin:false},{id:"Boards",icon:"ti-layout-board",admin:false},{id:"Intelligence",icon:"ti-brain",admin:false},{id:"Reports",icon:"ti-chart-bar",admin:false},{id:"Preview",icon:"ti-mail",admin:false},{id:"Send",icon:"ti-send",admin:true},{id:"Audit",icon:"ti-history",admin:true},{id:"RALPH",icon:"ti-circuit-board",admin:true}];
   var TABS=ALL_TABS.filter(function(t){return isAdmin||!t.admin;});
 
   function getDept(r){if(["Owner","COO","VP of Operations","Office Manager","Office Administrator","Installation Manager","Warehouse Manager","Service Manager","Service Coordinator","Engineering Coordinator","Permitting Coordinator","Scheduling Coordinator","Inspection Coordinator","Net Metering Coordinator","Receptionist"].indexOf(r)>=0)return"Operations";if(["President of Sales","Sales Relations Manager","Account Manager","After Hours Account Manager","Onboarding Coordinator"].indexOf(r)>=0)return"Sales";if(["Accounting Manager","Commissions Coordinator","Director of Finance","Funding Coordinator"].indexOf(r)>=0)return"Finance";return"AI";}
@@ -1591,6 +1593,73 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
         })}
       </div>
       <IntelligenceTab pd={pd} member={team[intelMember]} role={team[intelMember]?team[intelMember].role:"Owner"} th={th} kpiTags={kpiTags} onAiSummary={genAiSummary} aiSummary={aiSummary} summaryLoading={summaryLoading} activeSubTab={intelSub} onSubTabChange={setIntelSub}/>
+    </div>}
+
+    {/* REPORTS — charts & analytics (Increment 1: charts + red-flag categories + RAG + CSV) */}
+    {tab==="Reports"&&<div>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:"1rem",flexWrap:"wrap"}}>
+        <p style={{margin:0,fontSize:13,color:th.textMuted,flex:1}}>Visual KPI reports. Live pipeline from Pipedrive; operational insights from the notes-extraction pipeline.</p>
+        <span style={{fontSize:11,color:th.textMuted,background:th.inputBg,border:"1px solid "+th.borderPlain,borderRadius:20,padding:"4px 10px"}}><i className="ti ti-clock" style={{fontSize:12,marginRight:4}} aria-hidden="true"/>Insights through {OPS_INSIGHTS.dataFreshThrough}</span>
+        <button onClick={function(){dlCSV(OPS_INSIGHTS.redFlags.categories.map(function(c){return {category:c.category,count:c.count};}),"red-flag-categories-"+todayStr()+".csv");}} style={{display:"flex",alignItems:"center",gap:5,background:th.inputBg,border:"1px solid "+th.borderPlain,borderRadius:20,padding:"5px 12px",color:th.textMuted,fontSize:11,cursor:"pointer"}}><i className="ti ti-download" style={{fontSize:13}} aria-hidden="true"/>Export CSV</button>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:8,marginBottom:"1rem"}}>
+        {[
+          {l:"Total jobs",v:OPS_INSIGHTS.funnel.totalJobs.toLocaleString(),c:th.text,s:OPS_INSIGHTS.records.toLocaleString()+" extracted"},
+          {l:"Win rate (resolved)",v:OPS_INSIGHTS.funnel.winRate+"%",c:OPS_INSIGHTS.funnel.winRate>=70?C.green:C.amber,s:OPS_INSIGHTS.funnel.resolved.toLocaleString()+" resolved"},
+          {l:"Cancellation rate",v:OPS_INSIGHTS.cancellations.ratePctOfResolved+"%",c:OPS_INSIGHTS.cancellations.ratePctOfResolved>30?C.red:OPS_INSIGHTS.cancellations.ratePctOfResolved>15?C.amber:C.green,s:"median "+OPS_INSIGHTS.cancellations.medianDaysToCancel+"d to cancel"},
+          {l:"Inspection fail rate",v:OPS_INSIGHTS.inspections.failRatePct+"%",c:OPS_INSIGHTS.inspections.failRatePct>30?C.red:OPS_INSIGHTS.inspections.failRatePct>15?C.amber:C.green,s:OPS_INSIGHTS.inspections.failures.toLocaleString()+" of "+OPS_INSIGHTS.inspections.events.toLocaleString()},
+          {l:"Clawback at risk",v:OPS_INSIGHTS.clawbackAtRisk.toLocaleString(),c:C.red,s:"jobs flagged"},
+        ].map(function(card,i){return <div key={i} style={Object.assign({},glass,{padding:"0.9rem 1rem"})}>
+          <p style={{margin:"0 0 5px",fontSize:11,color:th.textMuted}}>{card.l}</p>
+          <p style={{margin:0,fontSize:23,fontWeight:600,color:card.c}}>{card.v}</p>
+          <p style={{margin:"3px 0 0",fontSize:10.5,color:th.textMuted}}>{card.s}</p>
+        </div>;})}
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(330px,1fr))",gap:10}}>
+        <div style={glass}>
+          <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Red-flag categories</p>
+          <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>{OPS_INSIGHTS.redFlags.total.toLocaleString()} flags across {OPS_INSIGHTS.redFlags.records.toLocaleString()} jobs</p>
+          <BarChart th={th} color={C.red} data={OPS_INSIGHTS.redFlags.categories.map(function(c){return {label:c.category.replace(/_/g," "),value:c.count};})}/>
+        </div>
+
+        <div style={glass}>
+          <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Job outcomes</p>
+          <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>All jobs by current lifecycle phase</p>
+          <DonutChart th={th} data={OPS_INSIGHTS.funnel.outcomes.map(function(o,i){return {label:o.label,value:o.count,color:[C.blue,C.green,"#1d9e75",C.red,C.amber,th.textMuted][i]};})}/>
+        </div>
+
+        <div style={glass}>
+          <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Cycle times (median days)</p>
+          <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Days between milestones</p>
+          <BarChart th={th} color={C.blue} format="days" data={OPS_INSIGHTS.cycleTimes.filter(function(c){return c.median!=null;}).map(function(c){return {label:c.label,value:c.median};})}/>
+        </div>
+
+        <div style={glass}>
+          <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Where jobs cancel</p>
+          <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Stage when cancelled (% of cancellations)</p>
+          <BarChart th={th} color={C.red} format="pct" data={OPS_INSIGHTS.cancellations.where.map(function(w){return {label:w.board,value:w.pct};})}/>
+        </div>
+
+        <div style={glass}>
+          <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>How long before cancelling</p>
+          <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Age at cancellation (% of cancellations)</p>
+          <BarChart th={th} color={C.amber} format="pct" data={OPS_INSIGHTS.cancellations.ageBuckets.map(function(a){return {label:a.label,value:a.pct};})}/>
+        </div>
+
+        <div style={glass}>
+          <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Active jobs by board {pd.isLive?"":"(simulated)"}</p>
+          <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Live pipeline &middot; {pd.totalActiveJobs} active jobs</p>
+          <BarChart th={th} color={C.orange} data={Object.keys(pd.boards).map(function(b){return {label:b,value:pd.boards[b].jobCount};}).filter(function(d){return d.value>0;}).sort(function(a,b){return b.value-a.value;}).slice(0,10)}/>
+        </div>
+
+        <div style={Object.assign({},glass,{gridColumn:"1/-1"})}>
+          <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Cancellations per month</p>
+          <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Trend over time</p>
+          <LineChart th={th} color={C.orange} data={OPS_INSIGHTS.cancellations.monthly.map(function(m){return {label:m.month.slice(2),value:m.count};})}/>
+        </div>
+      </div>
     </div>}
 
     {/* PREVIEW */}
