@@ -18,6 +18,7 @@ import { mapPullResponse } from "./data/pull-response";
 import { BarChart, LineChart, DonutChart } from "./charts";
 import { chartColors } from "./chart-utils";
 import { OPS_INSIGHTS } from "./data/ops-insights";
+import { KPI_TARGETS, DELTA_CARD_KEYS, CANCELLATIONS_PER_MONTH_TARGET } from "../shared/domain/kpi-targets";
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // THEME
@@ -1096,6 +1097,24 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
     return function(){cancelled=true;clearInterval(id);};
   },[]);
 
+  // Increment 2 — period-over-period comparison (reuses /api/snapshots/compare) + editable targets
+  var [cmpRange,setCmpRange]=useState("Month over month");
+  var [cmpInfo,setCmpInfo]=useState({loading:false,status:null,rows:null,currentDate:null,baselineDate:null,message:null,error:null});
+  var [editTargets,setEditTargets]=useState(false);
+  var [targets,setTargets]=useState(function(){
+    var t={};Object.keys(KPI_TARGETS).forEach(function(k){t[k]=Object.assign({},KPI_TARGETS[k]);});
+    try{var saved=JSON.parse(localStorage.getItem("unitea:kpiTargets")||"{}");Object.keys(saved).forEach(function(k){if(!t[k])t[k]={betterWhen:"neutral",target:null};t[k]=Object.assign({},t[k],{target:saved[k]});});}catch(e){}
+    return t;
+  });
+  useEffect(function(){
+    if(tab!=="Reports")return;
+    setCmpInfo(function(s){return Object.assign({},s,{loading:true,error:null});});
+    fetch("/api/snapshots/compare?range="+encodeURIComponent(cmpRange),{credentials:"include"})
+      .then(function(r){return r.ok?r.json():Promise.reject(new Error("HTTP "+r.status));})
+      .then(function(j){setCmpInfo({loading:false,status:j.status||null,rows:j.rows||null,currentDate:j.currentDate||null,baselineDate:j.baselineDate||null,message:j.message||null,error:null});})
+      .catch(function(e){setCmpInfo({loading:false,status:"error",rows:null,currentDate:null,baselineDate:null,message:null,error:e.message||"compare failed"});});
+  },[tab,cmpRange]);
+
   // Single derived pipelineData â€” everything in the app reads from this
   var pd=useMemo(function(){return buildPipelineData(liveApiData);},[liveApiData]);
 
@@ -1106,6 +1125,24 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
   function updMember(i,u){setTeam(function(t){return t.map(function(x,idx){return idx===i?u:x;});});}
   function switchToDraft(){setDraft(true);addAudit("Switched to draft mode","Changes will not affect live send","system");}
   function pushToLive(){setDraft(false);setShowPush(false);setAudit(function(l){return l.map(function(e){return Object.assign({},e,{draft:false});});});addAudit("Pushed to live","All draft changes promoted","system");}
+  // Increment 2 helpers
+  var RANGE_SHORT={"Week over week":"last week","Month over month":"last month","Quarter over quarter":"last quarter","Year over year":"last year"};
+  function fmtDiff(format,n){
+    if(format==="money"){var a=Math.abs(n);if(a>=1e6)return"$"+(n/1e6).toFixed(1)+"M";if(a>=1e3)return"$"+Math.round(n/1e3)+"k";return"$"+Math.round(n);}
+    if(format==="days")return Math.round(n)+"d";
+    if(format==="percent")return (Math.round(n*10)/10)+"%";
+    return Math.round(n).toLocaleString();
+  }
+  function ragColor(cur,tgt,better){
+    if(tgt==null||better==="neutral")return null;
+    if(better==="higher"){var r=tgt===0?(cur>0?1:0):cur/tgt;return r>=1?cc.green:r>=0.8?cc.amber:cc.red;}
+    if(cur<=tgt)return cc.green;var over=tgt===0?(cur>0?2:0):cur/tgt;return over<=1.25?cc.amber:cc.red;
+  }
+  function setTarget(key,val){
+    setTargets(function(prev){var next=Object.assign({},prev);next[key]=Object.assign({},next[key]||{betterWhen:"neutral"},{target:val});
+      try{var saved=JSON.parse(localStorage.getItem("unitea:kpiTargets")||"{}");if(val==null){delete saved[key];}else{saved[key]=val;}localStorage.setItem("unitea:kpiTargets",JSON.stringify(saved));}catch(e){}
+      return next;});
+  }
 
   async function pullLive(isAuto){
     setLiveLoad(true);
@@ -1605,6 +1642,55 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
         <button onClick={function(){dlCSV(OPS_INSIGHTS.redFlags.categories.map(function(c){return {category:c.category,count:c.count};}),"red-flag-categories-"+todayStr()+".csv");}} style={{display:"flex",alignItems:"center",gap:5,background:th.inputBg,border:"1px solid "+th.borderPlain,borderRadius:20,padding:"7px 14px",color:th.textMuted,fontSize:11,cursor:"pointer"}}><i className="ti ti-download" style={{fontSize:13}} aria-hidden="true"/>Export CSV</button>
       </div>
 
+      {/* Live KPIs vs period — range control + period-over-period deltas + targets/RAG (Increment 2) */}
+      <div style={Object.assign({},glass,{marginBottom:"1rem"})}>
+        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:12}}>
+          <div style={{flex:1,minWidth:170}}>
+            <p style={{margin:0,fontSize:14,fontWeight:500,color:th.text}}>Live KPIs vs {RANGE_SHORT[cmpRange]||"prior period"}</p>
+            <p style={{margin:"2px 0 0",fontSize:11,color:th.textMuted}}>{cmpInfo.status==="ok"&&cmpInfo.baselineDate?cmpInfo.baselineDate+" → "+cmpInfo.currentDate+" · from daily snapshots":"period-over-period from daily snapshots"}</p>
+          </div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+            {RANGES.map(function(r){var a=cmpRange===r;return <button key={r} title={r} onClick={function(){setCmpRange(r);}} style={{padding:"6px 11px",border:"1px solid "+(a?C.orange:th.borderPlain),borderRadius:20,background:a?C.orange+"18":th.inputBg,color:a?C.orange:th.textMuted,fontSize:11,cursor:"pointer",fontWeight:a?500:400}}>{r.split(" ")[0]}</button>;})}
+          </div>
+          <button onClick={function(){setEditTargets(function(e){return !e;});}} style={{display:"flex",alignItems:"center",gap:5,background:editTargets?C.orange+"18":th.inputBg,border:"1px solid "+(editTargets?C.orange:th.borderPlain),borderRadius:20,padding:"7px 12px",color:editTargets?C.orange:th.textMuted,fontSize:11,cursor:"pointer"}}><i className="ti ti-target" style={{fontSize:13}} aria-hidden="true"/>{editTargets?"Done":"Edit targets"}</button>
+        </div>
+        {cmpInfo.loading?
+          <p style={{margin:0,fontSize:12,color:th.textMuted,textAlign:"center",padding:"1rem 0"}}>Loading comparison…</p>
+        :cmpInfo.error?
+          <p style={{margin:0,fontSize:12,color:cc.red,textAlign:"center",padding:"1rem 0"}}>{cmpInfo.error}</p>
+        :cmpInfo.status==="ok"&&cmpInfo.rows?
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(165px,1fr))",gap:8}}>
+            {DELTA_CARD_KEYS.map(function(k){
+              var row=cmpInfo.rows.find(function(x){return x.key===k;});
+              if(!row)return null;
+              var meta=targets[k]||{betterWhen:"neutral",target:null};
+              var good=meta.betterWhen==="neutral"?null:((meta.betterWhen==="higher"&&row.direction==="up")||(meta.betterWhen==="lower"&&row.direction==="down"));
+              var dcol=row.direction==="flat"?th.textMuted:(good===null?th.textMuted:(good?cc.green:cc.red));
+              var icon=row.direction==="up"?"ti-trending-up":row.direction==="down"?"ti-trending-down":"ti-minus";
+              var sign=row.delta>0?"+":"";
+              var rag=ragColor(row.current,meta.target,meta.betterWhen);
+              return <div key={k} style={{background:th.inputBg,border:"1px solid "+th.borderPlain,borderRadius:10,padding:"0.8rem 0.9rem"}}>
+                <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+                  <span style={{flex:1,fontSize:11,color:th.textMuted}}>{row.label}</span>
+                  {rag&&<span title="vs target" style={{width:8,height:8,borderRadius:"50%",background:rag,flexShrink:0}}/>}
+                </div>
+                <p style={{margin:0,fontSize:21,fontWeight:600,color:th.text}}>{fmtDiff(row.format,row.current)}</p>
+                <div style={{display:"flex",alignItems:"center",gap:4,marginTop:3}}>
+                  <i className={"ti "+icon} style={{fontSize:13,color:dcol}} aria-hidden="true"/>
+                  <span style={{fontSize:11.5,fontWeight:500,color:dcol}}>{sign}{fmtDiff(row.format,row.delta)}{row.pct!==null?" ("+sign+row.pct.toFixed(1)+"%)":""}</span>
+                </div>
+                {editTargets
+                  ?<div style={{display:"flex",alignItems:"center",gap:4,marginTop:6}}><span style={{fontSize:10.5,color:th.textMuted}}>target</span><input type="number" value={meta.target==null?"":meta.target} onChange={function(e){setTarget(k,e.target.value===""?null:Number(e.target.value));}} style={{width:62,background:th.card,border:"1px solid "+th.inputBorder,borderRadius:6,color:th.selectText,fontSize:11,padding:"3px 6px",fontFamily:"inherit"}}/></div>
+                  :(meta.target!=null&&<p style={{margin:"5px 0 0",fontSize:10.5,color:th.textMuted}}>target {fmtDiff(row.format,meta.target)}</p>)}
+              </div>;
+            })}
+          </div>
+        :<div style={{textAlign:"center",padding:"1rem 0"}}>
+          <p style={{margin:"0 0 4px",fontSize:13,color:th.text}}>Comparisons activate as daily snapshots accumulate</p>
+          <p style={{margin:0,fontSize:11,color:th.textMuted}}>{cmpInfo.message||"Need at least two daily snapshots for period-over-period deltas."}</p>
+        </div>}
+      </div>
+
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:8,marginBottom:"1rem"}}>
         {[
           {l:"Total jobs",v:OPS_INSIGHTS.funnel.totalJobs.toLocaleString(),c:th.text,s:OPS_INSIGHTS.records.toLocaleString()+" extracted"},
@@ -1659,7 +1745,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
         <div style={Object.assign({},glass,{gridColumn:"1/-1"})}>
           <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Cancellations per month</p>
           <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Trend over time</p>
-          <LineChart th={th} color={cc.orange} data={OPS_INSIGHTS.cancellations.monthly.map(function(m){return {label:m.month.slice(2),value:m.count};})}/>
+          <LineChart th={th} color={cc.orange} goal={CANCELLATIONS_PER_MONTH_TARGET} goalColor={cc.amber} data={OPS_INSIGHTS.cancellations.monthly.map(function(m){return {label:m.month.slice(2),value:m.count};})}/>
         </div>
       </div>
     </div>}

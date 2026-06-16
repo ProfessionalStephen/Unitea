@@ -53,12 +53,14 @@ export function LineChart(props: {
   color?: string;
   area?: boolean;
   height?: number;
+  goal?: number;
+  goalColor?: string;
 }) {
-  const { data, th, format = "int", color = CHART_COLORS[0], area = true, height = 200 } = props;
+  const { data, th, format = "int", color = CHART_COLORS[0], area = true, height = 200, goal, goalColor } = props;
   const VBW = 600, VBH = height;
   const padL = 44, padR = 12, padT = 12, padB = 26;
   const n = data.length;
-  const max = Math.max(...data.map((d) => d.value), 1);
+  const max = Math.max(...data.map((d) => d.value), goal ?? 1, 1);
   const min = Math.min(...data.map((d) => d.value), 0);
   const span = max - min || 1;
   const plotW = VBW - padL - padR, plotH = VBH - padT - padB;
@@ -83,6 +85,12 @@ export function LineChart(props: {
           </g>
         );
       })}
+      {goal != null && goal >= min && goal <= max && (
+        <g>
+          <line x1={padL} y1={y(goal)} x2={VBW - padR} y2={y(goal)} stroke={goalColor || th.textMuted} strokeWidth={1} strokeDasharray="5 4" />
+          <text x={VBW - padR} y={y(goal) - 4} textAnchor="end" fontSize={10} fill={goalColor || th.textMuted}>target {fmtNum(goal, format)}</text>
+        </g>
+      )}
       {area && n > 1 && <path d={areaPath} fill={color} opacity={0.13} />}
       {n > 1 && <polyline points={pts} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" />}
       {data.map((d, i) => (
