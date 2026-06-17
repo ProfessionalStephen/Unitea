@@ -97,15 +97,39 @@ export async function writeSnapshot(
   dataSource: "live" | "simulated"
 ): Promise<SnapshotIndexEntry> {
   const date = easternDateKey();
+
+  // ── Compact projection for storage ──
+  // Once the live pull is un-truncated (16k+ open deals), the per-deal arrays
+  // inside boardData.stages[].deals — and the full stalled/moved lists — make
+  // each daily blob tens of MB, which would break History reads (series/compare
+  // fetch up to ~180 whole snapshots at once). Those readers use ONLY the scalar
+  // aggregates + per-stage counts, and the UI reads per-deal data from the LIVE
+  // pull, never from a stored snapshot. So drop the per-deal arrays and cap the
+  // tactical lists here — the daily blob stays small regardless of CRM size.
+  const STORE_LIST_CAP = 250;
+  const srcBoards: Record<string, any> = pipelineData.boardData ?? {};
+  const compactBoardData: Record<string, any> = {};
+  for (const name of Object.keys(srcBoards)) {
+    const b = srcBoards[name] ?? {};
+    const stages = Array.isArray(b.stages)
+      ? b.stages.map((s: any) => {
+          const lean: Record<string, any> = {};
+          for (const k of Object.keys(s)) { if (k !== "deals") lean[k] = s[k]; }
+          return lean;
+        })
+      : [];
+    compactBoardData[name] = { ...b, stages };
+  }
+
   const snapshot: PipelineSnapshot = {
     version: 1,
     capturedAt: new Date().toISOString(),
     date,
     dataSource,
     totalActiveJobs: pipelineData.totalActiveJobs ?? 0,
-    boardData: pipelineData.boardData ?? {},
-    stalled: pipelineData.stalled ?? [],
-    moved24h: pipelineData.moved24h ?? [],
+    boardData: compactBoardData,
+    stalled: (pipelineData.stalled ?? []).slice(0, STORE_LIST_CAP),
+    moved24h: (pipelineData.moved24h ?? []).slice(0, STORE_LIST_CAP),
     pipelines: pipelineData.pipelines ?? [],
     // Aggregates — copied verbatim from pullPipedrive's PipelineData
     totalPipelineValue: pipelineData.totalPipelineValue ?? 0,

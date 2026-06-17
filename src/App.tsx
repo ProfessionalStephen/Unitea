@@ -449,6 +449,7 @@ function CronStatusBanner({status,th}){
     <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
       <div style={{width:14,height:14,borderRadius:"50%",background:clr,boxShadow:"0 0 12px "+clr,flexShrink:0}}/>
       <div style={{flex:1,minWidth:260}}>
+        <p style={{margin:"0 0 1px",fontSize:10,fontWeight:600,letterSpacing:0.4,textTransform:"uppercase",color:th.textMuted}}>Daily Pipedrive Sync &amp; Briefing</p>
         <p style={{margin:0,fontSize:14,fontWeight:600,color:clr}}>{headline}</p>
         <p style={{margin:"3px 0 0",fontSize:11,color:th.textMuted,lineHeight:1.5}}>
           Next run: <span style={{color:th.text}}>{status.nextRunLabel||"unknown"}</span> Â· {status.cronScheduleUtc||""}

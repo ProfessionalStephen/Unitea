@@ -152,23 +152,39 @@ function isBeforeYMD(iso: string | undefined | null, ymd: string): boolean {
 
 export async function pullPipedrive(domain: string, apiKey: string): Promise<PipelineData> {
   const baseUrl = `https://${domain}.pipedrive.com/api/v1`;
-  async function pdGet(path: string): Promise<any> {
-    const url = `${baseUrl}${path}${path.includes("?") ? "&" : "?"}api_token=${apiKey}`;
-    const r = await fetch(url);
-    if (!r.ok) throw new Error(`Pipedrive ${path} ${r.status}`);
-    const j = await r.json();
-    if (j && j.success === false) throw new Error(`Pipedrive ${path}: ${j.error}`);
-    return j.data;
+
+  // Fetch a Pipedrive v1 collection IN FULL. The previous single-page pdGet
+  // capped at limit=500 with NO pagination, so on a CRM with 16k+ open deals
+  // every board count and aggregate was computed from an arbitrary 500-deal
+  // slice (~3% of reality). Loop on additional_data.pagination until drained.
+  async function pdGetAll(path: string): Promise<any[]> {
+    const out: any[] = [];
+    let start = 0;
+    const LIMIT = 500;
+    for (let page = 0; page < 500; page++) {          // hard stop: never loop forever
+      const sep = path.includes("?") ? "&" : "?";
+      const url = `${baseUrl}${path}${sep}start=${start}&limit=${LIMIT}&api_token=${apiKey}`;
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(`Pipedrive ${path} ${r.status}`);
+      const j = await r.json();
+      if (j && j.success === false) throw new Error(`Pipedrive ${path}: ${j.error}`);
+      const data = Array.isArray(j.data) ? j.data : [];
+      out.push(...data);
+      const pg = j.additional_data && j.additional_data.pagination;
+      if (!pg || !pg.more_items_in_collection || data.length === 0) break;
+      start = typeof pg.next_start === "number" ? pg.next_start : start + data.length;
+    }
+    return out;
   }
 
-  // Parallel fetch: 6 endpoints
+  // Parallel fetch: 6 endpoints, each drained to completion.
   const [pipelinesRaw, stagesRaw, openDealsRaw, wonDealsRaw, lostDealsRaw, activitiesRaw] = await Promise.all([
-    pdGet("/pipelines"),
-    pdGet("/stages"),
-    pdGet("/deals?status=open&limit=500"),
-    pdGet("/deals?status=won&limit=500&sort=won_time%20DESC"),
-    pdGet("/deals?status=lost&limit=500&sort=lost_time%20DESC"),
-    pdGet("/activities?done=0&limit=500"),
+    pdGetAll("/pipelines"),
+    pdGetAll("/stages"),
+    pdGetAll("/deals?status=open"),
+    pdGetAll("/deals?status=won"),
+    pdGetAll("/deals?status=lost"),
+    pdGetAll("/activities?done=0"),
   ]);
 
   const pipelinesArr = Array.isArray(pipelinesRaw) ? pipelinesRaw : [];

@@ -12,6 +12,11 @@ import {
 import { resolveKpi, viewFromCron } from "../../shared/kpi/index.js";
 import { KPI_TARGETS } from "../../shared/domain/kpi-targets.js";
 
+// "Daily Pipedrive Sync & Briefing": pull the full CRM, write the snapshot,
+// then email briefings. The paginated pull (16k+ open deals) plus the email
+// loop needs headroom beyond the 10s default.
+export const config = { maxDuration: 60 };
+
 // ─────────────────────────────────────────────────────────────
 // All domain data (TEAM, role→kpis map, KPI configs) imported
 // from ../../shared/domain. Single source of truth shared with
@@ -339,7 +344,7 @@ function buildEmail(person: TeamMember, pd: any, dataSource: string, kpiConfigs:
       <a href="${DASHBOARD_URL}" style="display:inline-block;background:linear-gradient(135deg,#F28F1D,#D4721A);color:#fff;padding:8px 18px;border-radius:6px;text-decoration:none;font-weight:500;font-size:13px;">Open dashboard &rarr;</a>
       <div style="margin-top:10px;font-size:10px;color:#6B6266;line-height:1.4;">
         Unicity Solar Energy &middot; ${dataSource === "live" ? "Live Pipedrive snapshot" : "Data unavailable"} &middot; ${new Date().toLocaleString("en-GB", { timeZone: "America/New_York" })} ET<br>
-        Read-only system. Numbers update each weekday at 7am EDT (6am EST).
+        Daily Pipedrive Sync &amp; Briefing &middot; read-only &middot; numbers update each weekday at 7am EDT (6am EST).
       </div>
     </div>`;
 
