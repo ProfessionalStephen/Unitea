@@ -1084,6 +1084,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
 
   // KPI drill-down state
   var [kpiDrillKpi,setKpiDrillKpi]=useState(null);
+  var [drillBoards,setDrillBoards]=useState(null);   // PR-B: scope drill-down to a clicked board
 
   // Cron status state â€” fetched from /api/cron/status. Refreshed every 30s.
   var [cronStatus,setCronStatus]=useState({loading:true,mode:"unknown",error:null});
@@ -1117,6 +1118,38 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
       .then(function(j){setCmpInfo({loading:false,status:j.status||null,rows:j.rows||null,currentDate:j.currentDate||null,baselineDate:j.baselineDate||null,message:j.message||null,error:null});})
       .catch(function(e){setCmpInfo({loading:false,status:"error",rows:null,currentDate:null,baselineDate:null,message:null,error:e.message||"compare failed"});});
   },[tab,cmpRange]);
+
+  // PR-A: reporting controls (date-range + region) + URL-encoded saved views + live-KPI trend series
+  var [fltDays,setFltDays]=useState(90);
+  var [fltRegion,setFltRegion]=useState("All");
+  var [trendMetric,setTrendMetric]=useState("totalActiveJobs");
+  var [seriesInfo,setSeriesInfo]=useState({loading:false,status:null,series:null,error:null});
+  var [copied,setCopied]=useState(false);
+  var RANGE_OPTS=[{d:30,l:"30d"},{d:90,l:"90d"},{d:180,l:"6mo"},{d:365,l:"1yr"},{d:730,l:"All"}];
+  var METRIC_LABELS={totalActiveJobs:"Active jobs",totalPipelineValue:"Pipeline value",endToEndDays:"End-to-end days",wonThisWeek:"Won this week",wonLast30d:"Won last 30d",lostLast30d:"Lost last 30d",cancellationRate30d:"Cancellation rate (30d)",activitiesOverdue:"Overdue activities",callsDueToday:"Calls due today",installsScheduledThisWeek:"Installs scheduled (wk)",permitsSubmittedThisWeek:"Permits submitted (wk)",nmaSubmittedThisWeek:"NMA submitted (wk)"};
+  useEffect(function(){  // hydrate the view from the URL once (shareable saved views)
+    try{var q=new URLSearchParams(window.location.search);
+      if(q.get("tab"))setTab(q.get("tab"));
+      if(q.get("days"))setFltDays(Number(q.get("days"))||90);
+      if(q.get("region"))setFltRegion(q.get("region"));
+      if(q.get("metric"))setTrendMetric(q.get("metric"));
+    }catch(e){}
+  },[]);
+  useEffect(function(){  // keep the URL in sync so any view is a shareable link
+    try{var q=new URLSearchParams();q.set("tab",tab);q.set("days",String(fltDays));q.set("region",fltRegion);q.set("metric",trendMetric);
+      window.history.replaceState(null,"","?"+q.toString());
+    }catch(e){}
+  },[tab,fltDays,fltRegion,trendMetric]);
+  useEffect(function(){  // date-rangeable live-KPI trend, fetched on Overview + when the range changes
+    if(tab!=="Overview")return;
+    setSeriesInfo(function(s){return Object.assign({},s,{loading:true,error:null});});
+    fetch("/api/snapshots/series?days="+fltDays,{credentials:"include"})
+      .then(function(r){return r.ok?r.json():Promise.reject(new Error("HTTP "+r.status));})
+      .then(function(j){setSeriesInfo({loading:false,status:j.status||null,series:j.series||null,error:null});})
+      .catch(function(e){setSeriesInfo({loading:false,status:"error",series:null,error:e.message||"series failed"});});
+  },[tab,fltDays]);
+  function copyLink(){try{navigator.clipboard.writeText(window.location.href);setCopied(true);setTimeout(function(){setCopied(false);},1500);}catch(e){}}
+  function dmShort(ymd){return String(ymd).slice(8,10)+"/"+String(ymd).slice(5,7);}
 
   // Single derived pipelineData â€” everything in the app reads from this
   var pd=useMemo(function(){return buildPipelineData(liveApiData);},[liveApiData]);
@@ -1451,7 +1484,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
   return <div className={dark?"theme-dark":"theme-light"} style={{minHeight:"100vh",background:th.bg,fontFamily:"var(--font-sans)",position:"relative",display:"flex"}}>
     {boardEdit!==null&&<BoardModal member={team[boardEdit]} allBoards={allBoards} onSave={function(nb){addAudit("Board access updated",team[boardEdit].name+" boards updated","access");updMember(boardEdit,Object.assign({},team[boardEdit],{boards:nb}));setBoardEdit(null);}} onClose={function(){setBoardEdit(null);}} th={th}/>}
     {showPush&&<PushModal draftChanges={draftChanges} team={team} onConfirm={pushToLive} onCancel={function(){setShowPush(false);}} th={th}/>}
-    {kpiDrillKpi&&<KpiDrillDown kpiName={kpiDrillKpi} pd={pd} memberBoards={team[prevPerson]?team[prevPerson].boards:Object.keys(BOARDS)} role={team[prevPerson]?team[prevPerson].role:"Owner"} onClose={function(){setKpiDrillKpi(null);}} th={th} onNavigateIntelligence={function(sub){setKpiDrillKpi(null);setTab("Intelligence");setIntelSub(sub);}}/>}
+    {kpiDrillKpi&&<KpiDrillDown kpiName={kpiDrillKpi} pd={pd} memberBoards={drillBoards||(team[prevPerson]?team[prevPerson].boards:Object.keys(BOARDS))} role={team[prevPerson]?team[prevPerson].role:"Owner"} onClose={function(){setKpiDrillKpi(null);setDrillBoards(null);}} th={th} onNavigateIntelligence={function(sub){setKpiDrillKpi(null);setDrillBoards(null);setTab("Intelligence");setIntelSub(sub);}}/>}
 
     {/* Sidebar nav (rebuild step 2) */}
     <aside style={{width:212,flexShrink:0,minHeight:"100vh",background:th.tabBg,borderRight:"1px solid "+th.borderPlain,display:"flex",flexDirection:"column",gap:2,padding:"16px 12px",boxSizing:"border-box"}}>
@@ -1524,6 +1557,18 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
 
     {/* OVERVIEW — graph-forward landing (rebuild step 3) */}
     {tab==="Overview"&&<div>
+      {/* Reporting controls — date range + region + shareable link (PR-A) */}
+      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:14}}>
+        <span style={{fontSize:11,color:th.textMuted}}>Range</span>
+        <div style={{display:"flex",gap:4,background:th.bg,border:"1px solid "+th.borderPlain,borderRadius:9,padding:3}}>
+          {RANGE_OPTS.map(function(o){var a=fltDays===o.d;return <button key={o.d} onClick={function(){setFltDays(o.d);}} style={{fontSize:11,padding:"5px 10px",borderRadius:6,border:"none",cursor:"pointer",background:a?C.orange:"transparent",color:a?"#1a1209":th.textMuted,fontWeight:a?500:400}}>{o.l}</button>;})}
+        </div>
+        <span style={{fontSize:11,color:th.textMuted,marginLeft:6}}>Region</span>
+        <select value={fltRegion} onChange={function(e){setFltRegion(e.target.value);}} style={Object.assign({},iS,{padding:"6px 9px"})}>
+          <option value="All">All regions</option><option value="FL">Florida</option><option value="CA">California</option>
+        </select>
+        <button onClick={copyLink} title="Copy a shareable link to this view" style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:5,background:th.inputBg,border:"1px solid "+th.borderPlain,borderRadius:20,padding:"6px 12px",color:copied?cc.green:th.textMuted,fontSize:11,cursor:"pointer"}}><i className={"ti "+(copied?"ti-check":"ti-link")} style={{fontSize:13}} aria-hidden="true"/>{copied?"Copied":"Copy link"}</button>
+      </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:12,marginBottom:14}}>
         {[
           {l:"Active jobs",v:String(pd.totalActiveJobs),c:th.text,s:pd.totalStuck+" stuck"},
@@ -1531,11 +1576,25 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
           {l:"Cancellation rate",v:OPS_INSIGHTS.cancellations.ratePctOfResolved+"%",c:OPS_INSIGHTS.cancellations.ratePctOfResolved>30?cc.red:OPS_INSIGHTS.cancellations.ratePctOfResolved>15?cc.amber:cc.green,s:"median "+OPS_INSIGHTS.cancellations.medianDaysToCancel+"d to cancel"},
           {l:"Median cycle → PTO",v:OPS_INSIGHTS.cycleTimes[0].median+"d",c:th.text,s:"contract → PTO"},
           {l:"Inspection fail rate",v:OPS_INSIGHTS.inspections.failRatePct+"%",c:OPS_INSIGHTS.inspections.failRatePct>30?cc.red:OPS_INSIGHTS.inspections.failRatePct>15?cc.amber:cc.green,s:OPS_INSIGHTS.inspections.failures.toLocaleString()+" failures"}
-        ].map(function(card,i){return <div key={i} style={Object.assign({},glass,{padding:"0.9rem 1.1rem"})}>
+        ].map(function(card,i){return <div key={i} onClick={function(){setDrillBoards(null);setKpiDrillKpi(card.l+" — "+card.v);}} title="Click to drill into the underlying jobs" style={Object.assign({},glass,{padding:"0.9rem 1.1rem",cursor:"pointer"})}>
           <p style={{margin:"0 0 5px",fontSize:11,color:th.textMuted}}>{card.l}</p>
           <p style={{margin:0,fontSize:25,fontWeight:600,color:card.c}}>{card.v}</p>
           <p style={{margin:"3px 0 0",fontSize:10.5,color:th.textMuted}}>{card.s}</p>
         </div>;})}
+      </div>
+      {/* Date-rangeable live-KPI trend (PR-A) */}
+      <div style={Object.assign({},glass,{marginBottom:12})}>
+        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:10}}>
+          <span style={{fontSize:14,fontWeight:500,color:th.text,flex:1}}>KPI trend</span>
+          <select value={trendMetric} onChange={function(e){setTrendMetric(e.target.value);}} style={Object.assign({},iS,{padding:"5px 9px"})}>
+            {Object.keys(METRIC_LABELS).map(function(k){return <option key={k} value={k}>{METRIC_LABELS[k]}</option>;})}
+          </select>
+        </div>
+        {seriesInfo.loading?
+          <p style={{margin:0,fontSize:12,color:th.textMuted,textAlign:"center",padding:"1.5rem 0"}}>Loading trend…</p>
+        :seriesInfo.status==="ok"&&seriesInfo.series&&seriesInfo.series.length>1?
+          <LineChart th={th} color={cc.blue} height={220} format={trendMetric==="totalPipelineValue"?"money":trendMetric==="cancellationRate30d"?"pct":trendMetric==="endToEndDays"?"days":"int"} data={seriesInfo.series.map(function(row){return {label:dmShort(row.date),value:row[trendMetric]};})}/>
+        :<div style={{textAlign:"center",padding:"1.5rem 0"}}><p style={{margin:"0 0 4px",fontSize:13,color:th.text}}>Trend builds as daily snapshots accumulate</p><p style={{margin:0,fontSize:11,color:th.textMuted}}>{seriesInfo.series&&seriesInfo.series.length===1?"Only one snapshot so far — need ≥2 points.":"No snapshots in this range yet."}</p></div>}
       </div>
       <div style={{display:"grid",gridTemplateColumns:"minmax(280px,360px) 1fr",gap:12,marginBottom:12}}>
         <div style={glass}>
@@ -1546,7 +1605,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
         <div style={glass}>
           <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Cancellations per month</p>
           <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Trend &middot; dashed = target</p>
-          <LineChart th={th} color={cc.orange} goal={CANCELLATIONS_PER_MONTH_TARGET} goalColor={cc.amber} data={OPS_INSIGHTS.cancellations.monthly.map(function(m){return {label:monthYear(m.month,true),value:m.count};})}/>
+          <LineChart th={th} color={cc.orange} goal={CANCELLATIONS_PER_MONTH_TARGET} goalColor={cc.amber} data={OPS_INSIGHTS.cancellations.monthly.slice(-Math.max(3,Math.ceil(fltDays/30))).map(function(m){return {label:monthYear(m.month,true),value:m.count};})}/>
         </div>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
@@ -1558,7 +1617,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
         <div style={glass}>
           <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Active pipeline by board {pd.isLive?"":"(simulated)"}</p>
           <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Live &middot; {pd.totalActiveJobs} active jobs</p>
-          <BarChart th={th} color={cc.orange} data={Object.keys(pd.boards).map(function(b){return {label:b,value:pd.boards[b].jobCount};}).filter(function(d){return d.value>0;}).sort(function(a,b){return b.value-a.value;}).slice(0,8)}/>
+          <BarChart th={th} color={cc.orange} onBarClick={function(b){setDrillBoards([b]);setKpiDrillKpi(b+" — jobs");}} data={Object.keys(pd.boards).map(function(b){return {label:b,value:pd.boards[b].jobCount};}).filter(function(d){return d.value>0&&(fltRegion==="All"||(BOARDS[d.label]&&BOARDS[d.label].region===fltRegion));}).sort(function(a,b){return b.value-a.value;}).slice(0,8)}/>
         </div>
       </div>
     </div>}
@@ -1665,7 +1724,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
       <div style={Object.assign({},glass,{marginBottom:12})}>
         <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Jobs by board {pd.isLive?"":"(simulated)"}</p>
         <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Open deals per board &middot; live pipeline</p>
-        <BarChart th={th} color={cc.blue} data={Object.keys(pd.boards).map(function(b){return {label:b,value:pd.boards[b].jobCount};}).filter(function(d){return d.value>0;}).sort(function(a,b){return b.value-a.value;})}/>
+        <BarChart th={th} color={cc.blue} onBarClick={function(b){setDrillBoards([b]);setKpiDrillKpi(b+" — jobs");}} data={Object.keys(pd.boards).map(function(b){return {label:b,value:pd.boards[b].jobCount};}).filter(function(d){return d.value>0;}).sort(function(a,b){return b.value-a.value;})}/>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:8}}>
         {allBoards.map(function(b){

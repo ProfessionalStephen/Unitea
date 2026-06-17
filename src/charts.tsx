@@ -13,8 +13,9 @@ export function BarChart(props: {
   format?: NumFormat;
   color?: string;
   labelChars?: number;
+  onBarClick?: (label: string) => void;
 }) {
-  const { data, th, format = "int", color = CHART_COLORS[0], labelChars = 22 } = props;
+  const { data, th, format = "int", color = CHART_COLORS[0], labelChars = 22, onBarClick } = props;
   const VBW = 600;
   const rowH = 30, padT = 8, padB = 8, labelW = 168, valW = 52;
   const H = Math.max(1, data.length) * rowH + padT + padB;
@@ -28,7 +29,7 @@ export function BarChart(props: {
         const y = padT + i * rowH;
         const w = Math.max(2, (d.value / max) * barMax);
         return (
-          <g key={d.label + i}>
+          <g key={d.label + i} onClick={onBarClick ? () => onBarClick(d.label) : undefined} style={onBarClick ? { cursor: "pointer" } : undefined}>
             <text x={labelW - 8} y={y + rowH / 2} textAnchor="end" dominantBaseline="middle"
               fontSize={12} fill={th.textMuted}>{truncLabel(d.label, labelChars)}
               <title>{d.label}</title>
