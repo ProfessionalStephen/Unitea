@@ -1,0 +1,13 @@
+{ "name":"rebuild-foundation","theme":"dark",
+  "checks":[
+    {"label":"fg.default / surface","fg":"#f4f2ee","bg":"#1c1e25","kind":"text"},
+    {"label":"fg.muted / surface","fg":"#a6a8b0","bg":"#1c1e25","kind":"text"},
+    {"label":"fg.subtle / surface","fg":"#888a93","bg":"#1c1e25","kind":"text"},
+    {"label":"fg.default / canvas","fg":"#f4f2ee","bg":"#131419","kind":"text"},
+    {"label":"fg.muted / canvas","fg":"#a6a8b0","bg":"#131419","kind":"text"},
+    {"label":"fg.subtle / canvas","fg":"#888a93","bg":"#131419","kind":"text"},
+    {"label":"accent-text / surface","fg":"#F28F1D","bg":"#1c1e25","kind":"text"},
+    {"label":"accent / surface (ui)","fg":"#F28F1D","bg":"#1c1e25","kind":"ui"},
+    {"label":"accent-fg on accent (btn)","fg":"#1a1209","bg":"#F28F1D","kind":"text"}
+  ]
+}

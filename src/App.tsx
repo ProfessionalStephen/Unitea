@@ -24,8 +24,10 @@ import { dmy, dmyTime, monthYear } from "./format";
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // THEME
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-const DARK={bg:"#1A1C20",card:"rgba(46,49,56,0.9)",cardSolid:"#2E3138",border:"rgba(242,143,29,0.18)",borderPlain:"rgba(255,255,255,0.08)",text:"#F0F0F0",textMuted:"#A39A92",inputBg:"rgba(255,255,255,0.06)",inputBorder:"rgba(242,143,29,0.25)",tabBg:"rgba(255,255,255,0.04)",tabBorder:"rgba(255,255,255,0.07)",selectText:"#F0F0F0",selectBg:"#2E3138"};
-const LIGHT={bg:"#F0F0F0",card:"rgba(232,232,232,0.95)",cardSolid:"#E8E8E8",border:"rgba(242,143,29,0.3)",borderPlain:"rgba(36,38,43,0.12)",text:"#24262B",textMuted:"#5A5A5A",inputBg:"rgba(36,38,43,0.06)",inputBorder:"rgba(242,143,29,0.4)",tabBg:"rgba(36,38,43,0.05)",tabBorder:"rgba(36,38,43,0.1)",selectText:"#24262B",selectBg:"#E8E8E8"};
+// Theme is driven by CSS variables in tokens.css. TH maps the legacy `th.*` keys onto those
+// semantic tokens, so every existing inline style is now token-backed and the theme switches via a
+// class on the root (.theme-dark / .theme-light) — no per-object swap. Gate-verified (design/foundation*).
+const TH={bg:"var(--bg-canvas)",card:"var(--bg-surface)",cardSolid:"var(--bg-surface)",border:"var(--border-subtle)",borderPlain:"var(--border-subtle)",text:"var(--fg-default)",textMuted:"var(--fg-muted)",inputBg:"var(--input-bg)",inputBorder:"var(--input-border)",tabBg:"var(--bg-component)",tabBorder:"var(--border-subtle)",selectText:"var(--fg-default)",selectBg:"var(--bg-component)"};
 const C={orange:"#F28F1D",orangeDeep:"#D4721A",green:"#22C55E",amber:"#F59E0B",red:"#EF4444",blue:"#1D6FB5",purple:"#A855F7"};
 
 // BOARDS + INDUSTRY_BENCHMARK_DAYS imported from ../shared/domain
@@ -1028,7 +1030,7 @@ function KpiMapping({kpiTags,setKpiTags,team,th,pd,kpiCfgState,onSaveKpiConfig})
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string}}){
   var [dark,setDark]=useState(true);
-  var th=dark?DARK:LIGHT;
+  var th=TH;
   var cc=chartColors(dark);   // theme-aware, gate-verified chart/RAG palette
   var glass={background:th.card,border:"1px solid "+th.border,borderRadius:16,padding:"1.25rem"};
   var iS={background:th.inputBg,border:"1px solid "+th.inputBorder,borderRadius:10,color:th.selectText,fontSize:13,padding:"8px 11px",outline:"none",fontFamily:"inherit",boxSizing:"border-box" as const};
@@ -1037,7 +1039,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
   var isAdmin=ADMIN_EMAILS.indexOf((session.email||"").toLowerCase())>=0;
 
   // Core state
-  var [tab,setTab]=useState(isAdmin?"Setup":"Boards");
+  var [tab,setTab]=useState("Overview");
   var [stab,setStab]=useState("General");
   var [pdKey,setPdKey]=useState("");
   var [gcId,setGcId]=useState("");
@@ -1436,25 +1438,44 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
     }
   }
 
-  var ALL_TABS=[{id:"Setup",icon:"ti-settings",admin:true},{id:"Team",icon:"ti-users",admin:false},{id:"Boards",icon:"ti-layout-board",admin:false},{id:"Intelligence",icon:"ti-brain",admin:false},{id:"Reports",icon:"ti-chart-bar",admin:false},{id:"Preview",icon:"ti-mail",admin:false},{id:"Send",icon:"ti-send",admin:true},{id:"Audit",icon:"ti-history",admin:true},{id:"RALPH",icon:"ti-circuit-board",admin:true}];
+  var ALL_TABS=[{id:"Overview",icon:"ti-layout-dashboard",admin:false},{id:"Setup",icon:"ti-settings",admin:true},{id:"Team",icon:"ti-users",admin:false},{id:"Boards",icon:"ti-layout-board",admin:false},{id:"Intelligence",icon:"ti-brain",admin:false},{id:"Reports",icon:"ti-chart-bar",admin:false},{id:"Preview",icon:"ti-mail",admin:false},{id:"Send",icon:"ti-send",admin:true},{id:"Audit",icon:"ti-history",admin:true},{id:"RALPH",icon:"ti-circuit-board",admin:true}];
   var TABS=ALL_TABS.filter(function(t){return isAdmin||!t.admin;});
+  var ICON_OF={}; ALL_TABS.forEach(function(t){ICON_OF[t.id]=t.icon;});
+  var NAV_GROUPS=[{label:"",items:["Overview"]},{label:"Analytics",items:["Reports","Intelligence","Boards"]},{label:"People",items:["Team","Preview"]},{label:"System",items:["Setup","Send","Audit","RALPH"]}];
 
   function getDept(r){if(["Owner","COO","VP of Operations","Office Manager","Office Administrator","Installation Manager","Warehouse Manager","Service Manager","Service Coordinator","Engineering Coordinator","Permitting Coordinator","Scheduling Coordinator","Inspection Coordinator","Net Metering Coordinator","Receptionist"].indexOf(r)>=0)return"Operations";if(["President of Sales","Sales Relations Manager","Account Manager","After Hours Account Manager","Onboarding Coordinator"].indexOf(r)>=0)return"Sales";if(["Accounting Manager","Commissions Coordinator","Director of Finance","Funding Coordinator"].indexOf(r)>=0)return"Finance";return"AI";}
 
   var filtTeam=team.filter(function(m){var ms=m.name.toLowerCase().indexOf(tSearch.toLowerCase())>=0||m.title.toLowerCase().indexOf(tSearch.toLowerCase())>=0;var mf=tFilter==="All"||getDept(m.role)===tFilter||m.region===tFilter;return ms&&mf;});
   var pdCol=apiHealth.pd==="connected"?C.green:apiHealth.pd==="checking"?C.amber:apiHealth.pd==="unknown"?th.textMuted:C.red;
 
-  return <div style={{minHeight:"100vh",background:th.bg,padding:"1.5rem 1rem",fontFamily:"var(--font-sans)",transition:"background 0.2s",position:"relative"}}>
+  return <div className={dark?"theme-dark":"theme-light"} style={{minHeight:"100vh",background:th.bg,fontFamily:"var(--font-sans)",position:"relative",display:"flex"}}>
     {boardEdit!==null&&<BoardModal member={team[boardEdit]} allBoards={allBoards} onSave={function(nb){addAudit("Board access updated",team[boardEdit].name+" boards updated","access");updMember(boardEdit,Object.assign({},team[boardEdit],{boards:nb}));setBoardEdit(null);}} onClose={function(){setBoardEdit(null);}} th={th}/>}
     {showPush&&<PushModal draftChanges={draftChanges} team={team} onConfirm={pushToLive} onCancel={function(){setShowPush(false);}} th={th}/>}
     {kpiDrillKpi&&<KpiDrillDown kpiName={kpiDrillKpi} pd={pd} memberBoards={team[prevPerson]?team[prevPerson].boards:Object.keys(BOARDS)} role={team[prevPerson]?team[prevPerson].role:"Owner"} onClose={function(){setKpiDrillKpi(null);}} th={th} onNavigateIntelligence={function(sub){setKpiDrillKpi(null);setTab("Intelligence");setIntelSub(sub);}}/>}
 
+    {/* Sidebar nav (rebuild step 2) */}
+    <aside style={{width:212,flexShrink:0,minHeight:"100vh",background:th.tabBg,borderRight:"1px solid "+th.borderPlain,display:"flex",flexDirection:"column",gap:2,padding:"16px 12px",boxSizing:"border-box"}}>
+      <div style={{display:"flex",alignItems:"center",gap:9,padding:"4px 8px 14px"}}>
+        <UniLogo/>
+        <div style={{display:"flex",alignItems:"baseline",gap:5}}><span style={{fontSize:15,fontWeight:600,color:th.text}}>Unicity</span><span style={{fontSize:15,fontWeight:600,color:C.orange}}>KPI</span></div>
+      </div>
+      {NAV_GROUPS.map(function(g){var items=g.items.filter(function(id){return TABS.some(function(t){return t.id===id;});});if(!items.length)return null;return <div key={g.label||"top"}>
+        {g.label?<div style={{fontSize:10,letterSpacing:"0.8px",color:th.textMuted,padding:"10px 8px 4px",textTransform:"uppercase" as const}}>{g.label}</div>:null}
+        {items.map(function(id){var a=tab===id;return <button key={id} onClick={function(){setTab(id);}} style={{width:"100%",display:"flex",alignItems:"center",gap:9,padding:"8px 9px",border:"none",borderRadius:8,background:a?C.orange+"24":"transparent",color:a?C.orange:th.text,fontWeight:a?500:400,fontSize:12.5,cursor:"pointer",textAlign:"left" as const,marginBottom:1}}>
+          <i className={"ti "+ICON_OF[id]} style={{fontSize:16,flexShrink:0}} aria-hidden="true"/>{id}
+        </button>;})}
+      </div>;})}
+      <div style={{marginTop:"auto",padding:"10px 8px 2px",fontSize:10.5,color:th.textMuted,borderTop:"1px solid "+th.borderPlain}}>Briefing system v8</div>
+    </aside>
+
+    {/* Main column */}
+    <main style={{flex:1,minWidth:0,minHeight:"100vh",padding:"1.25rem 1.5rem 2rem",boxSizing:"border-box"}}>
+
     {/* Header */}
     <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:"1rem",flexWrap:"wrap"}}>
-      <UniLogo/>
-      <div>
-        <div style={{display:"flex",alignItems:"baseline",gap:7}}><span style={{fontSize:19,fontWeight:500,color:th.text}}>Unicity</span><span style={{fontSize:19,fontWeight:500,color:C.orange}}>Solar Energy</span></div>
-        <p style={{margin:0,fontSize:11,color:th.textMuted}}>Morning KPI briefing system v8</p>
+      <div style={{flex:1,minWidth:120}}>
+        <div style={{fontSize:20,fontWeight:600,color:th.text}}>{tab}</div>
+        <p style={{margin:0,fontSize:11,color:th.textMuted}}>Unicity Solar Energy &middot; KPI dashboard</p>
       </div>
       <div style={{marginLeft:"auto",display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
         <span style={{fontSize:11,color:th.textMuted,marginRight:8}}>{session.name||session.email} Â· <a href="/api/auth/signout" style={{color:C.orange,textDecoration:"none"}}>Sign out</a></span>
@@ -1490,12 +1511,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
       <p style={{margin:0,fontSize:12,color:C.green}}>Read-only mode. Pipedrive GET endpoints only. Google OAuth: gmail.send + gmail.readonly. No data is modified.</p>
     </div>
 
-    {/* Tabs */}
-    <div style={{display:"flex",gap:3,marginBottom:"1.5rem",background:th.tabBg,border:"1px solid "+th.tabBorder,borderRadius:14,padding:4,overflowX:"auto"}}>
-      {TABS.map(function(t){var a=tab===t.id;return <button key={t.id} onClick={function(){setTab(t.id);}} style={{flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",gap:5,padding:"8px 10px",border:"none",borderRadius:11,background:a?C.orange:"transparent",color:a?"#fff":th.textMuted,fontWeight:a?500:400,fontSize:12,cursor:"pointer"}}>
-        <i className={"ti "+t.icon} style={{fontSize:13}} aria-hidden="true"/>{t.id}
-      </button>;})}
-    </div>
+    {/* nav moved to the sidebar */}
 
     {/* Data-source status banner â€” visible across all tabs */}
     {staleCache&&<div style={{background:C.blue+"0d",border:"1px solid "+C.blue+"22",borderRadius:10,padding:"7px 12px",marginBottom:"1rem",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
@@ -1504,6 +1520,47 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
     </div>}
     {!pd.isLive&&!staleCache&&<div style={{background:C.amber+"0d",border:"1px solid "+C.amber+"22",borderRadius:10,padding:"7px 12px",marginBottom:"1rem"}}>
       <span style={{fontSize:12,color:C.amber}}>{liveLoad?"Loading live data from Pipedrive...":"Simulated data \u2014 Pipedrive unavailable, using fallback numbers"}</span>
+    </div>}
+
+    {/* OVERVIEW — graph-forward landing (rebuild step 3) */}
+    {tab==="Overview"&&<div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:12,marginBottom:14}}>
+        {[
+          {l:"Active jobs",v:String(pd.totalActiveJobs),c:th.text,s:pd.totalStuck+" stuck"},
+          {l:"Win rate",v:OPS_INSIGHTS.funnel.winRate+"%",c:OPS_INSIGHTS.funnel.winRate>=70?cc.green:cc.amber,s:OPS_INSIGHTS.funnel.resolved.toLocaleString()+" resolved"},
+          {l:"Cancellation rate",v:OPS_INSIGHTS.cancellations.ratePctOfResolved+"%",c:OPS_INSIGHTS.cancellations.ratePctOfResolved>30?cc.red:OPS_INSIGHTS.cancellations.ratePctOfResolved>15?cc.amber:cc.green,s:"median "+OPS_INSIGHTS.cancellations.medianDaysToCancel+"d to cancel"},
+          {l:"Median cycle → PTO",v:OPS_INSIGHTS.cycleTimes[0].median+"d",c:th.text,s:"contract → PTO"},
+          {l:"Inspection fail rate",v:OPS_INSIGHTS.inspections.failRatePct+"%",c:OPS_INSIGHTS.inspections.failRatePct>30?cc.red:OPS_INSIGHTS.inspections.failRatePct>15?cc.amber:cc.green,s:OPS_INSIGHTS.inspections.failures.toLocaleString()+" failures"}
+        ].map(function(card,i){return <div key={i} style={Object.assign({},glass,{padding:"0.9rem 1.1rem"})}>
+          <p style={{margin:"0 0 5px",fontSize:11,color:th.textMuted}}>{card.l}</p>
+          <p style={{margin:0,fontSize:25,fontWeight:600,color:card.c}}>{card.v}</p>
+          <p style={{margin:"3px 0 0",fontSize:10.5,color:th.textMuted}}>{card.s}</p>
+        </div>;})}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"minmax(280px,360px) 1fr",gap:12,marginBottom:12}}>
+        <div style={glass}>
+          <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Job outcomes</p>
+          <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>All jobs by lifecycle phase</p>
+          <DonutChart th={th} data={OPS_INSIGHTS.funnel.outcomes.map(function(o,i){return {label:o.label,value:o.count,color:[cc.blue,cc.green,cc.teal,cc.red,cc.amber,cc.neutral][i]};})}/>
+        </div>
+        <div style={glass}>
+          <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Cancellations per month</p>
+          <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Trend &middot; dashed = target</p>
+          <LineChart th={th} color={cc.orange} goal={CANCELLATIONS_PER_MONTH_TARGET} goalColor={cc.amber} data={OPS_INSIGHTS.cancellations.monthly.map(function(m){return {label:monthYear(m.month,true),value:m.count};})}/>
+        </div>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+        <div style={glass}>
+          <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Top red-flag categories</p>
+          <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>{OPS_INSIGHTS.redFlags.total.toLocaleString()} flags &middot; notes-extracted</p>
+          <BarChart th={th} color={cc.red} data={OPS_INSIGHTS.redFlags.categories.slice(0,6).map(function(c){return {label:c.category.replace(/_/g," "),value:c.count};})}/>
+        </div>
+        <div style={glass}>
+          <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Active pipeline by board {pd.isLive?"":"(simulated)"}</p>
+          <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Live &middot; {pd.totalActiveJobs} active jobs</p>
+          <BarChart th={th} color={cc.orange} data={Object.keys(pd.boards).map(function(b){return {label:b,value:pd.boards[b].jobCount};}).filter(function(d){return d.value>0;}).sort(function(a,b){return b.value-a.value;}).slice(0,8)}/>
+        </div>
+      </div>
     </div>}
 
     {/* SETUP */}
@@ -1605,6 +1662,11 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
     {/* BOARDS */}
     {tab==="Boards"&&<div>
       <p style={{fontSize:13,color:th.textMuted,margin:"0 0 1rem"}}>{allBoards.length} boards - {Object.values(BOARDS).filter(function(b){return b.region==="FL";}).length} Florida - {Object.values(BOARDS).filter(function(b){return b.region==="CA";}).length} California</p>
+      <div style={Object.assign({},glass,{marginBottom:12})}>
+        <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Jobs by board {pd.isLive?"":"(simulated)"}</p>
+        <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Open deals per board &middot; live pipeline</p>
+        <BarChart th={th} color={cc.blue} data={Object.keys(pd.boards).map(function(b){return {label:b,value:pd.boards[b].jobCount};}).filter(function(d){return d.value>0;}).sort(function(a,b){return b.value-a.value;})}/>
+      </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:8}}>
         {allBoards.map(function(b){
           var bd=BOARDS[b];var rc=bd.region==="FL"?C.blue:C.green;
@@ -1894,6 +1956,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
         })}
       </div>
     </div>}
+    </main>
   </div>;
 }
 
