@@ -10,6 +10,7 @@ import {
   type KpiTag,
 } from "../../shared/domain/index.js";
 import { resolveKpi, viewFromCron } from "../../shared/kpi/index.js";
+import { KPI_TARGETS } from "../../shared/domain/kpi-targets.js";
 
 // ─────────────────────────────────────────────────────────────
 // All domain data (TEAM, role→kpis map, KPI configs) imported
@@ -343,10 +344,45 @@ function buildEmail(person: TeamMember, pd: any, dataSource: string, kpiConfigs:
     </div>`;
 
   const kpiSection = buildKpiSection(person, pd, kpiConfigs);
+  const alertSection = buildAlertSection(pd);
 
   return `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;max-width:640px;margin:0 auto;background:#24262B;color:#F0F0F0;border-radius:8px;overflow:hidden;">
-    ${header}${summaryCard}${kpiSection}${stalledList}${boardSection}${prioritySection}${ownerSection}${footer}
+    ${header}${summaryCard}${alertSection}${kpiSection}${stalledList}${boardSection}${prioritySection}${ownerSection}${footer}
   </div>`;
+}
+
+// Threshold alerts — flags any KPI whose live value breaches its target (KPI_TARGETS).
+// betterWhen "higher" => alert when below target; "lower" => alert when above. Empty when all clear.
+function buildAlertSection(pd: any): string {
+  if (!pd) return "";
+  const LABELS: Record<string, string> = {
+    totalActiveJobs: "Active jobs", wonThisWeek: "Won this week", wonLast30d: "Won last 30d",
+    lostLast30d: "Lost last 30d", cancellationRate30d: "Cancellation rate (30d)", endToEndDays: "End-to-end days",
+    activitiesOverdue: "Overdue activities", callsDueToday: "Calls due today",
+    installsScheduledThisWeek: "Installs scheduled (week)", permitsSubmittedThisWeek: "Permits submitted (week)",
+    nmaSubmittedThisWeek: "NMA submitted (week)",
+  };
+  const fmt = (k: string, v: number) => k === "cancellationRate30d" ? v.toFixed(1) + "%" : k === "endToEndDays" ? Math.round(v) + "d" : String(Math.round(v));
+  const rows: string[] = [];
+  for (const [key, t] of Object.entries(KPI_TARGETS)) {
+    if (t.target == null || t.betterWhen === "neutral") continue;
+    const v = Number((pd as any)[key]);
+    if (!Number.isFinite(v)) continue;
+    const breached = t.betterWhen === "higher" ? v < t.target : v > t.target;
+    if (!breached) continue;
+    const dir = t.betterWhen === "higher" ? "below target" : "over target";
+    rows.push(`<tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+      <td style="padding:7px 0;font-size:13px;color:#F0F0F0;">${LABELS[key] || key}</td>
+      <td style="padding:7px 0;font-size:13px;color:#EF4444;font-weight:600;text-align:right;">${fmt(key, v)}</td>
+      <td style="padding:7px 0;font-size:11px;color:#897C80;text-align:right;width:130px;">${dir} (${fmt(key, t.target as number)})</td>
+    </tr>`);
+  }
+  if (!rows.length) return "";
+  return `
+    <div style="padding:18px 24px;border-top:1px solid rgba(255,255,255,0.06);background:rgba(239,68,68,0.06);">
+      <div style="font-size:13px;color:#EF4444;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">Threshold alerts (${rows.length})</div>
+      <table style="width:100%;border-collapse:collapse;">${rows.join("")}</table>
+    </div>`;
 }
 
 // ─────────────────────────────────────────────
