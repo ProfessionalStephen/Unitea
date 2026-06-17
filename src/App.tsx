@@ -1084,6 +1084,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
 
   // KPI drill-down state
   var [kpiDrillKpi,setKpiDrillKpi]=useState(null);
+  var [drillBoards,setDrillBoards]=useState(null);   // PR-B: scope drill-down to a clicked board
 
   // Cron status state â€” fetched from /api/cron/status. Refreshed every 30s.
   var [cronStatus,setCronStatus]=useState({loading:true,mode:"unknown",error:null});
@@ -1483,7 +1484,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
   return <div className={dark?"theme-dark":"theme-light"} style={{minHeight:"100vh",background:th.bg,fontFamily:"var(--font-sans)",position:"relative",display:"flex"}}>
     {boardEdit!==null&&<BoardModal member={team[boardEdit]} allBoards={allBoards} onSave={function(nb){addAudit("Board access updated",team[boardEdit].name+" boards updated","access");updMember(boardEdit,Object.assign({},team[boardEdit],{boards:nb}));setBoardEdit(null);}} onClose={function(){setBoardEdit(null);}} th={th}/>}
     {showPush&&<PushModal draftChanges={draftChanges} team={team} onConfirm={pushToLive} onCancel={function(){setShowPush(false);}} th={th}/>}
-    {kpiDrillKpi&&<KpiDrillDown kpiName={kpiDrillKpi} pd={pd} memberBoards={team[prevPerson]?team[prevPerson].boards:Object.keys(BOARDS)} role={team[prevPerson]?team[prevPerson].role:"Owner"} onClose={function(){setKpiDrillKpi(null);}} th={th} onNavigateIntelligence={function(sub){setKpiDrillKpi(null);setTab("Intelligence");setIntelSub(sub);}}/>}
+    {kpiDrillKpi&&<KpiDrillDown kpiName={kpiDrillKpi} pd={pd} memberBoards={drillBoards||(team[prevPerson]?team[prevPerson].boards:Object.keys(BOARDS))} role={team[prevPerson]?team[prevPerson].role:"Owner"} onClose={function(){setKpiDrillKpi(null);setDrillBoards(null);}} th={th} onNavigateIntelligence={function(sub){setKpiDrillKpi(null);setDrillBoards(null);setTab("Intelligence");setIntelSub(sub);}}/>}
 
     {/* Sidebar nav (rebuild step 2) */}
     <aside style={{width:212,flexShrink:0,minHeight:"100vh",background:th.tabBg,borderRight:"1px solid "+th.borderPlain,display:"flex",flexDirection:"column",gap:2,padding:"16px 12px",boxSizing:"border-box"}}>
@@ -1575,7 +1576,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
           {l:"Cancellation rate",v:OPS_INSIGHTS.cancellations.ratePctOfResolved+"%",c:OPS_INSIGHTS.cancellations.ratePctOfResolved>30?cc.red:OPS_INSIGHTS.cancellations.ratePctOfResolved>15?cc.amber:cc.green,s:"median "+OPS_INSIGHTS.cancellations.medianDaysToCancel+"d to cancel"},
           {l:"Median cycle → PTO",v:OPS_INSIGHTS.cycleTimes[0].median+"d",c:th.text,s:"contract → PTO"},
           {l:"Inspection fail rate",v:OPS_INSIGHTS.inspections.failRatePct+"%",c:OPS_INSIGHTS.inspections.failRatePct>30?cc.red:OPS_INSIGHTS.inspections.failRatePct>15?cc.amber:cc.green,s:OPS_INSIGHTS.inspections.failures.toLocaleString()+" failures"}
-        ].map(function(card,i){return <div key={i} style={Object.assign({},glass,{padding:"0.9rem 1.1rem"})}>
+        ].map(function(card,i){return <div key={i} onClick={function(){setDrillBoards(null);setKpiDrillKpi(card.l+" — "+card.v);}} title="Click to drill into the underlying jobs" style={Object.assign({},glass,{padding:"0.9rem 1.1rem",cursor:"pointer"})}>
           <p style={{margin:"0 0 5px",fontSize:11,color:th.textMuted}}>{card.l}</p>
           <p style={{margin:0,fontSize:25,fontWeight:600,color:card.c}}>{card.v}</p>
           <p style={{margin:"3px 0 0",fontSize:10.5,color:th.textMuted}}>{card.s}</p>
@@ -1616,7 +1617,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
         <div style={glass}>
           <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Active pipeline by board {pd.isLive?"":"(simulated)"}</p>
           <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Live &middot; {pd.totalActiveJobs} active jobs</p>
-          <BarChart th={th} color={cc.orange} data={Object.keys(pd.boards).map(function(b){return {label:b,value:pd.boards[b].jobCount};}).filter(function(d){return d.value>0&&(fltRegion==="All"||(BOARDS[d.label]&&BOARDS[d.label].region===fltRegion));}).sort(function(a,b){return b.value-a.value;}).slice(0,8)}/>
+          <BarChart th={th} color={cc.orange} onBarClick={function(b){setDrillBoards([b]);setKpiDrillKpi(b+" — jobs");}} data={Object.keys(pd.boards).map(function(b){return {label:b,value:pd.boards[b].jobCount};}).filter(function(d){return d.value>0&&(fltRegion==="All"||(BOARDS[d.label]&&BOARDS[d.label].region===fltRegion));}).sort(function(a,b){return b.value-a.value;}).slice(0,8)}/>
         </div>
       </div>
     </div>}
@@ -1723,7 +1724,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
       <div style={Object.assign({},glass,{marginBottom:12})}>
         <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Jobs by board {pd.isLive?"":"(simulated)"}</p>
         <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Open deals per board &middot; live pipeline</p>
-        <BarChart th={th} color={cc.blue} data={Object.keys(pd.boards).map(function(b){return {label:b,value:pd.boards[b].jobCount};}).filter(function(d){return d.value>0;}).sort(function(a,b){return b.value-a.value;})}/>
+        <BarChart th={th} color={cc.blue} onBarClick={function(b){setDrillBoards([b]);setKpiDrillKpi(b+" — jobs");}} data={Object.keys(pd.boards).map(function(b){return {label:b,value:pd.boards[b].jobCount};}).filter(function(d){return d.value>0;}).sort(function(a,b){return b.value-a.value;})}/>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:8}}>
         {allBoards.map(function(b){
