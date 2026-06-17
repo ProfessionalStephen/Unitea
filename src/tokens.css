@@ -1,0 +1,56 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   Design tokens — the single source of truth for the dashboard's look.
+   3 tiers (DTCG model): primitives → semantic roles → components reference
+   semantic only. Theme = a class on the root (.theme-dark / .theme-light);
+   swapping the class re-themes with no component changes. Built to the Atelier
+   contract (D5/D6/D8/D9/D10) and gate-verified (design/*.tokens.json).
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* Primitives that don't change with theme: 8-pt spacing + 1.25 type scale. */
+:root {
+  --space-1: 4px;  --space-2: 8px;  --space-3: 12px; --space-4: 16px;
+  --space-5: 24px; --space-6: 32px; --space-7: 48px;
+  --text-xs: 12px; --text-sm: 13px; --text-base: 15px;
+  --text-md: 19px; --text-lg: 24px; --text-xl: 30px;
+  --radius-sm: 8px; --radius-md: 10px; --radius-lg: 14px;
+  --brand: #F28F1D;          /* Unicity orange — brand accent, theme-invariant hue */
+  --brand-deep: #D4721A;
+}
+
+/* Dark theme (default). Crisp near-neutral surfaces; brand reserved for accent. */
+:root, .theme-dark {
+  --bg-canvas: #131419;
+  --bg-surface: #1c1e25;
+  --bg-component: #23262f;
+  --bg-component-hover: #2a2e38;
+  --border-subtle: rgba(255, 255, 255, 0.07);
+  --border-default: rgba(255, 255, 255, 0.13);
+  --fg-default: #f4f2ee;
+  --fg-muted: #a6a8b0;
+  --fg-subtle: #888a93;
+  --accent: var(--brand);
+  --accent-fg: #1a1209;        /* dark text on the orange accent */
+  --accent-text: #F28F1D;      /* orange as TEXT/thin-UI — passes on dark surfaces */
+  --accent-weak: rgba(242, 143, 29, 0.14);
+  --input-bg: rgba(255, 255, 255, 0.05);
+  --input-border: rgba(242, 143, 29, 0.22);
+}
+
+/* Light theme. */
+.theme-light {
+  --bg-canvas: #faf9f6;
+  --bg-surface: #ffffff;
+  --bg-component: #f1efe9;
+  --bg-component-hover: #e9e7e0;
+  --border-subtle: rgba(36, 38, 43, 0.10);
+  --border-default: rgba(36, 38, 43, 0.18);
+  --fg-default: #1f2024;
+  --fg-muted: #585a62;
+  --fg-subtle: #6c6e76;
+  --accent: var(--brand);
+  --accent-fg: #1a1209;        /* dark text on the orange accent (orange is light → needs dark fg) */
+  --accent-text: #9a5300;      /* deep orange as TEXT/thin-UI — orange-on-white fails 4.5:1 */
+  --accent-weak: rgba(242, 143, 29, 0.14);
+  --input-bg: rgba(36, 38, 43, 0.04);
+  --input-border: rgba(242, 143, 29, 0.40);
+}

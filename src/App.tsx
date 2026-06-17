@@ -24,8 +24,10 @@ import { dmy, dmyTime, monthYear } from "./format";
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // THEME
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-const DARK={bg:"#1A1C20",card:"rgba(46,49,56,0.9)",cardSolid:"#2E3138",border:"rgba(242,143,29,0.18)",borderPlain:"rgba(255,255,255,0.08)",text:"#F0F0F0",textMuted:"#A39A92",inputBg:"rgba(255,255,255,0.06)",inputBorder:"rgba(242,143,29,0.25)",tabBg:"rgba(255,255,255,0.04)",tabBorder:"rgba(255,255,255,0.07)",selectText:"#F0F0F0",selectBg:"#2E3138"};
-const LIGHT={bg:"#F0F0F0",card:"rgba(232,232,232,0.95)",cardSolid:"#E8E8E8",border:"rgba(242,143,29,0.3)",borderPlain:"rgba(36,38,43,0.12)",text:"#24262B",textMuted:"#5A5A5A",inputBg:"rgba(36,38,43,0.06)",inputBorder:"rgba(242,143,29,0.4)",tabBg:"rgba(36,38,43,0.05)",tabBorder:"rgba(36,38,43,0.1)",selectText:"#24262B",selectBg:"#E8E8E8"};
+// Theme is driven by CSS variables in tokens.css. TH maps the legacy `th.*` keys onto those
+// semantic tokens, so every existing inline style is now token-backed and the theme switches via a
+// class on the root (.theme-dark / .theme-light) — no per-object swap. Gate-verified (design/foundation*).
+const TH={bg:"var(--bg-canvas)",card:"var(--bg-surface)",cardSolid:"var(--bg-surface)",border:"var(--border-subtle)",borderPlain:"var(--border-subtle)",text:"var(--fg-default)",textMuted:"var(--fg-muted)",inputBg:"var(--input-bg)",inputBorder:"var(--input-border)",tabBg:"var(--bg-component)",tabBorder:"var(--border-subtle)",selectText:"var(--fg-default)",selectBg:"var(--bg-component)"};
 const C={orange:"#F28F1D",orangeDeep:"#D4721A",green:"#22C55E",amber:"#F59E0B",red:"#EF4444",blue:"#1D6FB5",purple:"#A855F7"};
 
 // BOARDS + INDUSTRY_BENCHMARK_DAYS imported from ../shared/domain
@@ -1028,7 +1030,7 @@ function KpiMapping({kpiTags,setKpiTags,team,th,pd,kpiCfgState,onSaveKpiConfig})
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string}}){
   var [dark,setDark]=useState(true);
-  var th=dark?DARK:LIGHT;
+  var th=TH;
   var cc=chartColors(dark);   // theme-aware, gate-verified chart/RAG palette
   var glass={background:th.card,border:"1px solid "+th.border,borderRadius:16,padding:"1.25rem"};
   var iS={background:th.inputBg,border:"1px solid "+th.inputBorder,borderRadius:10,color:th.selectText,fontSize:13,padding:"8px 11px",outline:"none",fontFamily:"inherit",boxSizing:"border-box" as const};
@@ -1444,7 +1446,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
   var filtTeam=team.filter(function(m){var ms=m.name.toLowerCase().indexOf(tSearch.toLowerCase())>=0||m.title.toLowerCase().indexOf(tSearch.toLowerCase())>=0;var mf=tFilter==="All"||getDept(m.role)===tFilter||m.region===tFilter;return ms&&mf;});
   var pdCol=apiHealth.pd==="connected"?C.green:apiHealth.pd==="checking"?C.amber:apiHealth.pd==="unknown"?th.textMuted:C.red;
 
-  return <div style={{minHeight:"100vh",background:th.bg,padding:"1.5rem 1rem",fontFamily:"var(--font-sans)",transition:"background 0.2s",position:"relative"}}>
+  return <div className={dark?"theme-dark":"theme-light"} style={{minHeight:"100vh",background:th.bg,padding:"1.5rem 1rem",fontFamily:"var(--font-sans)",transition:"background 0.2s",position:"relative"}}>
     {boardEdit!==null&&<BoardModal member={team[boardEdit]} allBoards={allBoards} onSave={function(nb){addAudit("Board access updated",team[boardEdit].name+" boards updated","access");updMember(boardEdit,Object.assign({},team[boardEdit],{boards:nb}));setBoardEdit(null);}} onClose={function(){setBoardEdit(null);}} th={th}/>}
     {showPush&&<PushModal draftChanges={draftChanges} team={team} onConfirm={pushToLive} onCancel={function(){setShowPush(false);}} th={th}/>}
     {kpiDrillKpi&&<KpiDrillDown kpiName={kpiDrillKpi} pd={pd} memberBoards={team[prevPerson]?team[prevPerson].boards:Object.keys(BOARDS)} role={team[prevPerson]?team[prevPerson].role:"Owner"} onClose={function(){setKpiDrillKpi(null);}} th={th} onNavigateIntelligence={function(sub){setKpiDrillKpi(null);setTab("Intelligence");setIntelSub(sub);}}/>}
