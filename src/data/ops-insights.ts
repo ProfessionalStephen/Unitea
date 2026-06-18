@@ -6,25 +6,25 @@ export const OPS_INSIGHTS = {
   "generated": "2026-06-17",
   "dataFreshThrough": "2026-06-17",
   "source": "Solar Pipedrive notes-extraction pipeline (aggregates only, no PII)",
-  "records": 11395,
+  "records": 11405,
   "funnel": {
-    "totalJobs": 12280,
-    "winRate": 75.7,
-    "ptoReached": 8863,
+    "totalJobs": 12296,
+    "winRate": 75.8,
+    "ptoReached": 8888,
     "cancelled": 2844,
-    "resolved": 11707,
+    "resolved": 11732,
     "outcomes": [
       {
         "label": "Funding (AR)",
-        "count": 4466
+        "count": 4479
       },
       {
         "label": "Completed",
-        "count": 3834
+        "count": 3850
       },
       {
         "label": "In service",
-        "count": 563
+        "count": 559
       },
       {
         "label": "Cancelled",
@@ -32,7 +32,7 @@ export const OPS_INSIGHTS = {
       },
       {
         "label": "In field",
-        "count": 457
+        "count": 448
       },
       {
         "label": "Subcontract",
@@ -41,154 +41,154 @@ export const OPS_INSIGHTS = {
     ]
   },
   "redFlags": {
-    "total": 24217,
-    "records": 11395,
+    "total": 24126,
+    "records": 11405,
     "categories": [
       {
         "category": "Documentation & contract",
-        "count": 5797,
+        "count": 5814,
         "subcategories": [
           {
             "category": "documentation_blocker",
-            "count": 5797
+            "count": 5814
           }
         ]
       },
       {
         "category": "System, equipment & service",
-        "count": 3845,
+        "count": 3830,
         "subcategories": [
           {
             "category": "system_performance",
-            "count": 2350
+            "count": 2387
           },
           {
             "category": "equipment_failure",
-            "count": 692
+            "count": 653
           },
           {
             "category": "service_warranty",
-            "count": 443
+            "count": 436
           },
           {
             "category": "technical_issue",
-            "count": 360
+            "count": 354
           }
         ]
       },
       {
         "category": "Customer",
-        "count": 2772,
+        "count": 2755,
         "subcategories": [
           {
             "category": "customer_communication",
-            "count": 1665
+            "count": 1611
           },
           {
             "category": "customer_complaint",
-            "count": 1049
+            "count": 1085
           },
           {
             "category": "legal_fraud",
-            "count": 58
+            "count": 59
           }
         ]
       },
       {
         "category": "Cancellation",
-        "count": 2320,
+        "count": 2329,
         "subcategories": [
           {
             "category": "cancellation",
-            "count": 2320
+            "count": 2329
           }
         ]
       },
       {
         "category": "Financing & payment",
-        "count": 2060,
+        "count": 2044,
         "subcategories": [
           {
             "category": "financing",
-            "count": 2060
+            "count": 2044
           }
         ]
       },
       {
         "category": "Stalls & scheduling",
-        "count": 1775,
+        "count": 1749,
         "subcategories": [
           {
             "category": "stall_delay",
-            "count": 1359
+            "count": 1352
           },
           {
             "category": "scheduling",
-            "count": 416
+            "count": 397
           }
         ]
       },
       {
         "category": "Installation & site",
-        "count": 1607,
+        "count": 1604,
         "subcategories": [
           {
             "category": "installation_issue",
-            "count": 1095
+            "count": 1088
           },
           {
             "category": "site_structural",
-            "count": 512
+            "count": 516
           }
         ]
       },
       {
         "category": "Design & engineering",
-        "count": 1032,
+        "count": 1003,
         "subcategories": [
           {
             "category": "design_engineering",
-            "count": 1032
+            "count": 1003
           }
         ]
       },
       {
         "category": "Inspection",
-        "count": 1002,
+        "count": 992,
         "subcategories": [
           {
             "category": "inspection_failure",
-            "count": 1002
+            "count": 992
           }
         ]
       },
       {
         "category": "Permitting & compliance",
-        "count": 925,
+        "count": 921,
         "subcategories": [
           {
             "category": "permitting_compliance",
-            "count": 925
+            "count": 921
           }
         ]
       },
       {
         "category": "Utility / interconnection",
-        "count": 561,
+        "count": 566,
         "subcategories": [
           {
             "category": "utility_interconnection",
-            "count": 561
+            "count": 566
           }
         ]
       },
       {
         "category": "Other",
-        "count": 521,
+        "count": 519,
         "subcategories": [
           {
             "category": "other",
-            "count": 521
+            "count": 519
           }
         ]
       }
@@ -198,50 +198,50 @@ export const OPS_INSIGHTS = {
     {
       "key": "contract_to_pto",
       "label": "Contract \u2192 PTO",
-      "median": 108,
-      "mean": 134,
-      "n": 1360
+      "median": 153,
+      "mean": 261,
+      "n": 3862
     },
     {
       "key": "permit_to_pto",
       "label": "Permit \u2192 PTO",
-      "median": 62,
-      "mean": 81,
-      "n": 1845
+      "median": 104,
+      "mean": 182,
+      "n": 2887
     },
     {
       "key": "install_to_pto",
       "label": "Install \u2192 PTO",
-      "median": 50,
-      "mean": 69,
-      "n": 2552
+      "median": 88,
+      "mean": 176,
+      "n": 3079
     },
     {
       "key": "contract_to_install",
       "label": "Contract \u2192 install",
       "median": 41,
-      "mean": 63,
-      "n": 1357
+      "mean": 70,
+      "n": 3237
     },
     {
       "key": "permit_to_install",
       "label": "Permit \u2192 install",
-      "median": 9,
-      "mean": 23,
-      "n": 1635
+      "median": 10,
+      "mean": 26,
+      "n": 2884
     },
     {
       "key": "job_install_time",
       "label": "Install start \u2192 finish",
-      "median": 0,
-      "mean": 6,
-      "n": 2890
+      "median": 1,
+      "mean": 7,
+      "n": 2846
     }
   ],
   "cancellations": {
     "total": 2844,
     "medianDaysToCancel": 18.7,
-    "ratePctOfResolved": 24.3,
+    "ratePctOfResolved": 24.2,
     "where": [
       {
         "board": "New Sale Board",
@@ -400,43 +400,43 @@ export const OPS_INSIGHTS = {
     ]
   },
   "inspections": {
-    "events": 5874,
-    "failures": 1530,
-    "failRatePct": 26.0
+    "events": 5806,
+    "failures": 1518,
+    "failRatePct": 26.1
   },
-  "clawbackAtRisk": 1173,
-  "windowAsOf": "2026-06-17",
+  "clawbackAtRisk": 1159,
+  "windowAsOf": "2026-06-18",
   "windows": {
     "30": {
       "redFlags": {
-        "total": 735,
-        "records": 351,
+        "total": 707,
+        "records": 341,
         "categories": [
           {
             "category": "Documentation & contract",
-            "count": 213,
+            "count": 215,
             "subcategories": [
               {
                 "category": "documentation_blocker",
-                "count": 213
+                "count": 215
               }
             ]
           },
           {
             "category": "System, equipment & service",
-            "count": 121,
+            "count": 103,
             "subcategories": [
               {
                 "category": "system_performance",
-                "count": 68
+                "count": 63
               },
               {
                 "category": "technical_issue",
-                "count": 23
+                "count": 18
               },
               {
                 "category": "equipment_failure",
-                "count": 21
+                "count": 13
               },
               {
                 "category": "service_warranty",
@@ -445,98 +445,98 @@ export const OPS_INSIGHTS = {
             ]
           },
           {
-            "category": "Customer",
-            "count": 65,
-            "subcategories": [
-              {
-                "category": "customer_communication",
-                "count": 39
-              },
-              {
-                "category": "customer_complaint",
-                "count": 24
-              },
-              {
-                "category": "legal_fraud",
-                "count": 2
-              }
-            ]
-          },
-          {
             "category": "Installation & site",
-            "count": 50,
+            "count": 63,
             "subcategories": [
               {
                 "category": "installation_issue",
-                "count": 39
+                "count": 49
               },
               {
                 "category": "site_structural",
-                "count": 11
+                "count": 14
               }
             ]
           },
           {
-            "category": "Design & engineering",
-            "count": 49,
+            "category": "Customer",
+            "count": 55,
             "subcategories": [
               {
-                "category": "design_engineering",
-                "count": 49
+                "category": "customer_communication",
+                "count": 28
+              },
+              {
+                "category": "customer_complaint",
+                "count": 26
+              },
+              {
+                "category": "legal_fraud",
+                "count": 1
               }
             ]
           },
           {
             "category": "Financing & payment",
-            "count": 49,
+            "count": 48,
             "subcategories": [
               {
                 "category": "financing",
-                "count": 49
+                "count": 48
               }
             ]
           },
           {
             "category": "Cancellation",
-            "count": 49,
+            "count": 44,
             "subcategories": [
               {
                 "category": "cancellation",
-                "count": 49
+                "count": 44
               }
             ]
           },
           {
             "category": "Stalls & scheduling",
-            "count": 40,
+            "count": 41,
             "subcategories": [
               {
                 "category": "stall_delay",
-                "count": 33
+                "count": 35
               },
               {
                 "category": "scheduling",
-                "count": 7
+                "count": 6
+              }
+            ]
+          },
+          {
+            "category": "Design & engineering",
+            "count": 39,
+            "subcategories": [
+              {
+                "category": "design_engineering",
+                "count": 39
               }
             ]
           },
           {
             "category": "Permitting & compliance",
-            "count": 37,
+            "count": 35,
             "subcategories": [
               {
                 "category": "permitting_compliance",
-                "count": 37
+                "count": 35
               }
             ]
           },
           {
             "category": "Inspection",
-            "count": 29,
+            "count": 28,
             "subcategories": [
               {
                 "category": "inspection_failure",
-                "count": 29
+                "count": 28
               }
             ]
           },
@@ -552,11 +552,11 @@ export const OPS_INSIGHTS = {
           },
           {
             "category": "Utility / interconnection",
-            "count": 8,
+            "count": 11,
             "subcategories": [
               {
                 "category": "utility_interconnection",
-                "count": 8
+                "count": 11
               }
             ]
           }
@@ -566,95 +566,295 @@ export const OPS_INSIGHTS = {
         {
           "key": "contract_to_pto",
           "label": "Contract \u2192 PTO",
-          "median": 50,
-          "mean": 61,
-          "n": 37
+          "median": 63,
+          "mean": 82,
+          "n": 120
         },
         {
           "key": "permit_to_pto",
           "label": "Permit \u2192 PTO",
-          "median": 42,
-          "mean": 54,
-          "n": 50
+          "median": 50,
+          "mean": 66,
+          "n": 120
         },
         {
           "key": "install_to_pto",
           "label": "Install \u2192 PTO",
-          "median": 34,
-          "mean": 41,
-          "n": 77
+          "median": 44,
+          "mean": 58,
+          "n": 120
         },
         {
           "key": "contract_to_install",
           "label": "Contract \u2192 install",
-          "median": 15,
-          "mean": 28,
-          "n": 23
+          "median": 20,
+          "mean": 24,
+          "n": 81
         },
         {
           "key": "permit_to_install",
           "label": "Permit \u2192 install",
-          "median": 7,
-          "mean": 15,
-          "n": 33
+          "median": 5,
+          "mean": 8,
+          "n": 76
         },
         {
           "key": "job_install_time",
           "label": "Install start \u2192 finish",
           "median": 0,
-          "mean": 20,
-          "n": 65
+          "mean": 1,
+          "n": 76
         }
       ]
     },
     "90": {
       "redFlags": {
-        "total": 2172,
-        "records": 853,
+        "total": 2157,
+        "records": 858,
         "categories": [
           {
             "category": "Documentation & contract",
-            "count": 560,
+            "count": 559,
             "subcategories": [
               {
                 "category": "documentation_blocker",
-                "count": 560
+                "count": 559
               }
             ]
           },
           {
             "category": "System, equipment & service",
-            "count": 404,
+            "count": 394,
             "subcategories": [
               {
                 "category": "system_performance",
-                "count": 264
-              },
-              {
-                "category": "technical_issue",
-                "count": 52
+                "count": 261
               },
               {
                 "category": "equipment_failure",
-                "count": 51
+                "count": 47
+              },
+              {
+                "category": "technical_issue",
+                "count": 47
               },
               {
                 "category": "service_warranty",
-                "count": 37
+                "count": 39
               }
             ]
           },
           {
             "category": "Customer",
-            "count": 211,
+            "count": 199,
             "subcategories": [
               {
                 "category": "customer_communication",
-                "count": 118
+                "count": 107
               },
               {
                 "category": "customer_complaint",
                 "count": 88
+              },
+              {
+                "category": "legal_fraud",
+                "count": 4
+              }
+            ]
+          },
+          {
+            "category": "Installation & site",
+            "count": 175,
+            "subcategories": [
+              {
+                "category": "installation_issue",
+                "count": 121
+              },
+              {
+                "category": "site_structural",
+                "count": 54
+              }
+            ]
+          },
+          {
+            "category": "Financing & payment",
+            "count": 168,
+            "subcategories": [
+              {
+                "category": "financing",
+                "count": 168
+              }
+            ]
+          },
+          {
+            "category": "Cancellation",
+            "count": 149,
+            "subcategories": [
+              {
+                "category": "cancellation",
+                "count": 149
+              }
+            ]
+          },
+          {
+            "category": "Stalls & scheduling",
+            "count": 131,
+            "subcategories": [
+              {
+                "category": "stall_delay",
+                "count": 104
+              },
+              {
+                "category": "scheduling",
+                "count": 27
+              }
+            ]
+          },
+          {
+            "category": "Permitting & compliance",
+            "count": 95,
+            "subcategories": [
+              {
+                "category": "permitting_compliance",
+                "count": 95
+              }
+            ]
+          },
+          {
+            "category": "Design & engineering",
+            "count": 86,
+            "subcategories": [
+              {
+                "category": "design_engineering",
+                "count": 86
+              }
+            ]
+          },
+          {
+            "category": "Inspection",
+            "count": 81,
+            "subcategories": [
+              {
+                "category": "inspection_failure",
+                "count": 81
+              }
+            ]
+          },
+          {
+            "category": "Other",
+            "count": 71,
+            "subcategories": [
+              {
+                "category": "other",
+                "count": 71
+              }
+            ]
+          },
+          {
+            "category": "Utility / interconnection",
+            "count": 49,
+            "subcategories": [
+              {
+                "category": "utility_interconnection",
+                "count": 49
+              }
+            ]
+          }
+        ]
+      },
+      "cycleTimes": [
+        {
+          "key": "contract_to_pto",
+          "label": "Contract \u2192 PTO",
+          "median": 79,
+          "mean": 101,
+          "n": 360
+        },
+        {
+          "key": "permit_to_pto",
+          "label": "Permit \u2192 PTO",
+          "median": 65,
+          "mean": 79,
+          "n": 354
+        },
+        {
+          "key": "install_to_pto",
+          "label": "Install \u2192 PTO",
+          "median": 57,
+          "mean": 71,
+          "n": 354
+        },
+        {
+          "key": "contract_to_install",
+          "label": "Contract \u2192 install",
+          "median": 15,
+          "mean": 47,
+          "n": 230
+        },
+        {
+          "key": "permit_to_install",
+          "label": "Permit \u2192 install",
+          "median": 4,
+          "mean": 16,
+          "n": 220
+        },
+        {
+          "key": "job_install_time",
+          "label": "Install start \u2192 finish",
+          "median": 0,
+          "mean": 8,
+          "n": 224
+        }
+      ]
+    },
+    "180": {
+      "redFlags": {
+        "total": 4098,
+        "records": 1427,
+        "categories": [
+          {
+            "category": "Documentation & contract",
+            "count": 1070,
+            "subcategories": [
+              {
+                "category": "documentation_blocker",
+                "count": 1070
+              }
+            ]
+          },
+          {
+            "category": "System, equipment & service",
+            "count": 694,
+            "subcategories": [
+              {
+                "category": "system_performance",
+                "count": 430
+              },
+              {
+                "category": "equipment_failure",
+                "count": 108
+              },
+              {
+                "category": "technical_issue",
+                "count": 96
+              },
+              {
+                "category": "service_warranty",
+                "count": 60
+              }
+            ]
+          },
+          {
+            "category": "Customer",
+            "count": 389,
+            "subcategories": [
+              {
+                "category": "customer_communication",
+                "count": 213
+              },
+              {
+                "category": "customer_complaint",
+                "count": 171
               },
               {
                 "category": "legal_fraud",
@@ -664,279 +864,89 @@ export const OPS_INSIGHTS = {
           },
           {
             "category": "Financing & payment",
-            "count": 165,
+            "count": 322,
             "subcategories": [
               {
                 "category": "financing",
-                "count": 165
+                "count": 322
               }
             ]
           },
           {
             "category": "Installation & site",
-            "count": 159,
+            "count": 316,
             "subcategories": [
               {
                 "category": "installation_issue",
-                "count": 109
+                "count": 221
               },
               {
                 "category": "site_structural",
-                "count": 50
+                "count": 95
               }
             ]
           },
           {
             "category": "Cancellation",
-            "count": 148,
+            "count": 294,
             "subcategories": [
               {
                 "category": "cancellation",
-                "count": 148
+                "count": 294
               }
             ]
           },
           {
             "category": "Stalls & scheduling",
-            "count": 133,
+            "count": 243,
             "subcategories": [
               {
                 "category": "stall_delay",
-                "count": 103
+                "count": 188
               },
               {
                 "category": "scheduling",
-                "count": 30
-              }
-            ]
-          },
-          {
-            "category": "Design & engineering",
-            "count": 100,
-            "subcategories": [
-              {
-                "category": "design_engineering",
-                "count": 100
+                "count": 55
               }
             ]
           },
           {
             "category": "Permitting & compliance",
-            "count": 91,
+            "count": 193,
             "subcategories": [
               {
                 "category": "permitting_compliance",
-                "count": 91
+                "count": 193
               }
             ]
           },
           {
             "category": "Inspection",
-            "count": 86,
+            "count": 190,
             "subcategories": [
               {
                 "category": "inspection_failure",
-                "count": 86
+                "count": 190
               }
             ]
           },
           {
-            "category": "Other",
-            "count": 70,
+            "category": "Design & engineering",
+            "count": 161,
             "subcategories": [
               {
-                "category": "other",
-                "count": 70
+                "category": "design_engineering",
+                "count": 161
               }
             ]
           },
           {
             "category": "Utility / interconnection",
-            "count": 45,
+            "count": 115,
             "subcategories": [
               {
                 "category": "utility_interconnection",
-                "count": 45
-              }
-            ]
-          }
-        ]
-      },
-      "cycleTimes": [
-        {
-          "key": "contract_to_pto",
-          "label": "Contract \u2192 PTO",
-          "median": 54,
-          "mean": 86,
-          "n": 118
-        },
-        {
-          "key": "permit_to_pto",
-          "label": "Permit \u2192 PTO",
-          "median": 43,
-          "mean": 61,
-          "n": 189
-        },
-        {
-          "key": "install_to_pto",
-          "label": "Install \u2192 PTO",
-          "median": 36,
-          "mean": 50,
-          "n": 260
-        },
-        {
-          "key": "contract_to_install",
-          "label": "Contract \u2192 install",
-          "median": 14,
-          "mean": 43,
-          "n": 99
-        },
-        {
-          "key": "permit_to_install",
-          "label": "Permit \u2192 install",
-          "median": 5,
-          "mean": 16,
-          "n": 107
-        },
-        {
-          "key": "job_install_time",
-          "label": "Install start \u2192 finish",
-          "median": 0,
-          "mean": 10,
-          "n": 216
-        }
-      ]
-    },
-    "180": {
-      "redFlags": {
-        "total": 4087,
-        "records": 1419,
-        "categories": [
-          {
-            "category": "Documentation & contract",
-            "count": 1065,
-            "subcategories": [
-              {
-                "category": "documentation_blocker",
-                "count": 1065
-              }
-            ]
-          },
-          {
-            "category": "System, equipment & service",
-            "count": 695,
-            "subcategories": [
-              {
-                "category": "system_performance",
-                "count": 424
-              },
-              {
-                "category": "equipment_failure",
-                "count": 113
-              },
-              {
-                "category": "technical_issue",
-                "count": 97
-              },
-              {
-                "category": "service_warranty",
-                "count": 61
-              }
-            ]
-          },
-          {
-            "category": "Customer",
-            "count": 394,
-            "subcategories": [
-              {
-                "category": "customer_communication",
-                "count": 222
-              },
-              {
-                "category": "customer_complaint",
-                "count": 166
-              },
-              {
-                "category": "legal_fraud",
-                "count": 6
-              }
-            ]
-          },
-          {
-            "category": "Financing & payment",
-            "count": 317,
-            "subcategories": [
-              {
-                "category": "financing",
-                "count": 317
-              }
-            ]
-          },
-          {
-            "category": "Installation & site",
-            "count": 301,
-            "subcategories": [
-              {
-                "category": "installation_issue",
-                "count": 208
-              },
-              {
-                "category": "site_structural",
-                "count": 93
-              }
-            ]
-          },
-          {
-            "category": "Cancellation",
-            "count": 292,
-            "subcategories": [
-              {
-                "category": "cancellation",
-                "count": 292
-              }
-            ]
-          },
-          {
-            "category": "Stalls & scheduling",
-            "count": 238,
-            "subcategories": [
-              {
-                "category": "stall_delay",
-                "count": 179
-              },
-              {
-                "category": "scheduling",
-                "count": 59
-              }
-            ]
-          },
-          {
-            "category": "Inspection",
-            "count": 194,
-            "subcategories": [
-              {
-                "category": "inspection_failure",
-                "count": 194
-              }
-            ]
-          },
-          {
-            "category": "Permitting & compliance",
-            "count": 192,
-            "subcategories": [
-              {
-                "category": "permitting_compliance",
-                "count": 192
-              }
-            ]
-          },
-          {
-            "category": "Design & engineering",
-            "count": 178,
-            "subcategories": [
-              {
-                "category": "design_engineering",
-                "count": 178
+                "count": 115
               }
             ]
           },
@@ -949,16 +959,6 @@ export const OPS_INSIGHTS = {
                 "count": 111
               }
             ]
-          },
-          {
-            "category": "Utility / interconnection",
-            "count": 110,
-            "subcategories": [
-              {
-                "category": "utility_interconnection",
-                "count": 110
-              }
-            ]
           }
         ]
       },
@@ -966,99 +966,99 @@ export const OPS_INSIGHTS = {
         {
           "key": "contract_to_pto",
           "label": "Contract \u2192 PTO",
-          "median": 83,
-          "mean": 101,
-          "n": 271
+          "median": 97,
+          "mean": 120,
+          "n": 677
         },
         {
           "key": "permit_to_pto",
           "label": "Permit \u2192 PTO",
-          "median": 56,
-          "mean": 69,
-          "n": 471
+          "median": 77,
+          "mean": 88,
+          "n": 646
         },
         {
           "key": "install_to_pto",
           "label": "Install \u2192 PTO",
-          "median": 46,
-          "mean": 59,
-          "n": 599
+          "median": 67,
+          "mean": 77,
+          "n": 647
         },
         {
           "key": "contract_to_install",
           "label": "Contract \u2192 install",
-          "median": 16,
-          "mean": 39,
-          "n": 176
+          "median": 18,
+          "mean": 50,
+          "n": 471
         },
         {
           "key": "permit_to_install",
           "label": "Permit \u2192 install",
-          "median": 6,
-          "mean": 22,
-          "n": 249
+          "median": 4,
+          "mean": 13,
+          "n": 454
         },
         {
           "key": "job_install_time",
           "label": "Install start \u2192 finish",
-          "median": 0,
-          "mean": 7,
-          "n": 443
+          "median": 1,
+          "mean": 6,
+          "n": 455
         }
       ]
     },
     "365": {
       "redFlags": {
-        "total": 8278,
-        "records": 2599,
+        "total": 8244,
+        "records": 2596,
         "categories": [
           {
             "category": "Documentation & contract",
-            "count": 2046,
+            "count": 2045,
             "subcategories": [
               {
                 "category": "documentation_blocker",
-                "count": 2046
+                "count": 2045
               }
             ]
           },
           {
             "category": "System, equipment & service",
-            "count": 1336,
+            "count": 1330,
             "subcategories": [
               {
                 "category": "system_performance",
-                "count": 778
+                "count": 789
               },
               {
                 "category": "equipment_failure",
-                "count": 240
+                "count": 230
               },
               {
                 "category": "technical_issue",
-                "count": 185
+                "count": 183
               },
               {
                 "category": "service_warranty",
-                "count": 133
+                "count": 128
               }
             ]
           },
           {
             "category": "Customer",
-            "count": 814,
+            "count": 802,
             "subcategories": [
               {
                 "category": "customer_communication",
-                "count": 488
+                "count": 467
               },
               {
                 "category": "customer_complaint",
-                "count": 313
+                "count": 323
               },
               {
                 "category": "legal_fraud",
-                "count": 13
+                "count": 12
               }
             ]
           },
@@ -1074,69 +1074,69 @@ export const OPS_INSIGHTS = {
           },
           {
             "category": "Cancellation",
-            "count": 666,
+            "count": 667,
             "subcategories": [
               {
                 "category": "cancellation",
-                "count": 666
+                "count": 667
               }
             ]
           },
           {
             "category": "Installation & site",
-            "count": 612,
+            "count": 617,
             "subcategories": [
               {
                 "category": "installation_issue",
-                "count": 415
+                "count": 425
               },
               {
                 "category": "site_structural",
-                "count": 197
+                "count": 192
               }
             ]
           },
           {
             "category": "Stalls & scheduling",
-            "count": 467,
+            "count": 471,
             "subcategories": [
               {
                 "category": "stall_delay",
-                "count": 337
+                "count": 344
               },
               {
                 "category": "scheduling",
-                "count": 130
+                "count": 127
               }
             ]
           },
           {
             "category": "Design & engineering",
-            "count": 425,
+            "count": 403,
             "subcategories": [
               {
                 "category": "design_engineering",
-                "count": 425
+                "count": 403
               }
             ]
           },
           {
             "category": "Permitting & compliance",
-            "count": 374,
+            "count": 375,
             "subcategories": [
               {
                 "category": "permitting_compliance",
-                "count": 374
+                "count": 375
               }
             ]
           },
           {
             "category": "Inspection",
-            "count": 363,
+            "count": 355,
             "subcategories": [
               {
                 "category": "inspection_failure",
-                "count": 363
+                "count": 355
               }
             ]
           },
@@ -1152,11 +1152,11 @@ export const OPS_INSIGHTS = {
           },
           {
             "category": "Utility / interconnection",
-            "count": 200,
+            "count": 204,
             "subcategories": [
               {
                 "category": "utility_interconnection",
-                "count": 200
+                "count": 204
               }
             ]
           }
@@ -1166,44 +1166,44 @@ export const OPS_INSIGHTS = {
         {
           "key": "contract_to_pto",
           "label": "Contract \u2192 PTO",
-          "median": 76,
-          "mean": 97,
-          "n": 459
+          "median": 89,
+          "mean": 140,
+          "n": 1210
         },
         {
           "key": "permit_to_pto",
           "label": "Permit \u2192 PTO",
-          "median": 53,
-          "mean": 64,
-          "n": 806
+          "median": 69,
+          "mean": 82,
+          "n": 1083
         },
         {
           "key": "install_to_pto",
           "label": "Install \u2192 PTO",
-          "median": 46,
-          "mean": 58,
-          "n": 1026
+          "median": 58,
+          "mean": 73,
+          "n": 1086
         },
         {
           "key": "contract_to_install",
           "label": "Contract \u2192 install",
-          "median": 22,
-          "mean": 41,
-          "n": 427
+          "median": 24,
+          "mean": 53,
+          "n": 1058
         },
         {
           "key": "permit_to_install",
           "label": "Permit \u2192 install",
           "median": 6,
-          "mean": 16,
-          "n": 646
+          "mean": 17,
+          "n": 1034
         },
         {
           "key": "job_install_time",
           "label": "Install start \u2192 finish",
           "median": 0,
-          "mean": 6,
-          "n": 1025
+          "mean": 5,
+          "n": 1022
         }
       ]
     }
