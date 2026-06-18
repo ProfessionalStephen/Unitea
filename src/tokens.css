@@ -13,8 +13,8 @@
   --text-xs: 12px; --text-sm: 13px; --text-base: 15px;
   --text-md: 19px; --text-lg: 24px; --text-xl: 30px;
   --radius-sm: 8px; --radius-md: 10px; --radius-lg: 14px;
-  --brand: #F28F1D;          /* Unicity orange — brand accent, theme-invariant hue */
-  --brand-deep: #D4721A;
+  --brand: #F28F1D;          /* Unicity orange — brand accent (matches logo core), theme-invariant hue */
+  --brand-deep: #D9511C;     /* deep orange — matches the logo solar-burst's lower gradient stop */
 }
 
 /* Dark theme (default). Crisp near-neutral surfaces; brand reserved for accent. */
