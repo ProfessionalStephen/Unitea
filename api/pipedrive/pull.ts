@@ -2,6 +2,10 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { requireSession } from "../_lib/session.js";
 import { pullPipedrive } from "../_lib/pipedrive.js";
 
+// The pull now paginates the full CRM (16k+ open deals); allow headroom
+// beyond the 10s default so the manual "Pull live data" button can finish.
+export const config = { maxDuration: 60 };
+
 // ─────────────────────────────────────────────
 // Pipedrive proxy — read-only, server-side
 // Returns the full PipelineData shape (boardData + aggregates)

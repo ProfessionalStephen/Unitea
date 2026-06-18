@@ -449,6 +449,7 @@ function CronStatusBanner({status,th}){
     <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
       <div style={{width:14,height:14,borderRadius:"50%",background:clr,boxShadow:"0 0 12px "+clr,flexShrink:0}}/>
       <div style={{flex:1,minWidth:260}}>
+        <p style={{margin:"0 0 1px",fontSize:10,fontWeight:600,letterSpacing:0.4,textTransform:"uppercase",color:th.textMuted}}>Daily Pipedrive Sync &amp; Briefing</p>
         <p style={{margin:0,fontSize:14,fontWeight:600,color:clr}}>{headline}</p>
         <p style={{margin:"3px 0 0",fontSize:11,color:th.textMuted,lineHeight:1.5}}>
           Next run: <span style={{color:th.text}}>{status.nextRunLabel||"unknown"}</span> Â· {status.cronScheduleUtc||""}
@@ -1127,6 +1128,12 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
   var [copied,setCopied]=useState(false);
   var RANGE_OPTS=[{d:30,l:"30d"},{d:90,l:"90d"},{d:180,l:"6mo"},{d:365,l:"1yr"},{d:730,l:"All"}];
   var METRIC_LABELS={totalActiveJobs:"Active jobs",totalPipelineValue:"Pipeline value",endToEndDays:"End-to-end days",wonThisWeek:"Won this week",wonLast30d:"Won last 30d",lostLast30d:"Lost last 30d",cancellationRate30d:"Cancellation rate (30d)",activitiesOverdue:"Overdue activities",callsDueToday:"Calls due today",installsScheduledThisWeek:"Installs scheduled (wk)",permitsSubmittedThisWeek:"Permits submitted (wk)",nmaSubmittedThisWeek:"NMA submitted (wk)"};
+  // Notes-extracted insight charts (red flags, cycle times) honour the active date range via per-window
+  // buckets in OPS_INSIGHTS.windows; "All" (730) and any non-bucketed range fall back to all-time figures.
+  function opsWin(days){var w=OPS_INSIGHTS.windows&&OPS_INSIGHTS.windows[String(days)];return w||{redFlags:OPS_INSIGHTS.redFlags,cycleTimes:OPS_INSIGHTS.cycleTimes};}
+  var ow=opsWin(fltDays);
+  var owIsAll=!(OPS_INSIGHTS.windows&&OPS_INSIGHTS.windows[String(fltDays)]);
+  var owLabel=owIsAll?"all-time":"last "+((RANGE_OPTS.find(function(o){return o.d===fltDays;})||{l:fltDays+"d"}).l);
   useEffect(function(){  // hydrate the view from the URL once (shareable saved views)
     try{var q=new URLSearchParams(window.location.search);
       if(q.get("tab"))setTab(q.get("tab"));
@@ -1574,7 +1581,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
           {l:"Active jobs",v:String(pd.totalActiveJobs),c:th.text,s:pd.totalStuck+" stuck"},
           {l:"Win rate",v:OPS_INSIGHTS.funnel.winRate+"%",c:OPS_INSIGHTS.funnel.winRate>=70?cc.green:cc.amber,s:OPS_INSIGHTS.funnel.resolved.toLocaleString()+" resolved"},
           {l:"Cancellation rate",v:OPS_INSIGHTS.cancellations.ratePctOfResolved+"%",c:OPS_INSIGHTS.cancellations.ratePctOfResolved>30?cc.red:OPS_INSIGHTS.cancellations.ratePctOfResolved>15?cc.amber:cc.green,s:"median "+OPS_INSIGHTS.cancellations.medianDaysToCancel+"d to cancel"},
-          {l:"Median cycle → PTO",v:OPS_INSIGHTS.cycleTimes[0].median+"d",c:th.text,s:"contract → PTO"},
+          {l:"Median cycle → PTO",v:(ow.cycleTimes[0].median!=null?ow.cycleTimes[0].median+"d":"—"),c:th.text,s:"contract → PTO · "+owLabel},
           {l:"Inspection fail rate",v:OPS_INSIGHTS.inspections.failRatePct+"%",c:OPS_INSIGHTS.inspections.failRatePct>30?cc.red:OPS_INSIGHTS.inspections.failRatePct>15?cc.amber:cc.green,s:OPS_INSIGHTS.inspections.failures.toLocaleString()+" failures"}
         ].map(function(card,i){return <div key={i} onClick={function(){setDrillBoards(null);setKpiDrillKpi(card.l+" — "+card.v);}} title="Click to drill into the underlying jobs" style={Object.assign({},glass,{padding:"0.9rem 1.1rem",cursor:"pointer"})}>
           <p style={{margin:"0 0 5px",fontSize:11,color:th.textMuted}}>{card.l}</p>
@@ -1611,8 +1618,8 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
         <div style={glass}>
           <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Top red-flag categories</p>
-          <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>{OPS_INSIGHTS.redFlags.total.toLocaleString()} flags &middot; notes-extracted</p>
-          <BarChart th={th} color={cc.red} data={OPS_INSIGHTS.redFlags.categories.slice(0,6).map(function(c){return {label:c.category.replace(/_/g," "),value:c.count};})}/>
+          <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>{ow.redFlags.total.toLocaleString()} flags &middot; {owLabel}</p>
+          <BarChart th={th} color={cc.red} data={ow.redFlags.categories.slice(0,6).map(function(c){return {label:c.category.replace(/_/g," "),value:c.count};})}/>
         </div>
         <div style={glass}>
           <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Active pipeline by board {pd.isLive?"":"(simulated)"}</p>
@@ -1760,8 +1767,12 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
     {tab==="Reports"&&<div>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:"1rem",flexWrap:"wrap"}}>
         <p style={{margin:0,fontSize:13,color:th.textMuted,flex:1}}>Visual KPI reports. Live pipeline from Pipedrive; operational insights from the notes-extraction pipeline.</p>
+        <span style={{fontSize:11,color:th.textMuted}}>Insights range</span>
+        <div style={{display:"flex",gap:4,background:th.bg,border:"1px solid "+th.borderPlain,borderRadius:9,padding:3}}>
+          {RANGE_OPTS.map(function(o){var a=fltDays===o.d;return <button key={o.d} onClick={function(){setFltDays(o.d);}} style={{fontSize:11,padding:"5px 10px",borderRadius:6,border:"none",cursor:"pointer",background:a?C.orange:"transparent",color:a?"#1a1209":th.textMuted,fontWeight:a?500:400}}>{o.l}</button>;})}
+        </div>
         <span style={{fontSize:11,color:th.textMuted,background:th.inputBg,border:"1px solid "+th.borderPlain,borderRadius:20,padding:"4px 10px"}}><i className="ti ti-clock" style={{fontSize:12,marginRight:4}} aria-hidden="true"/>Insights through {dmy(OPS_INSIGHTS.dataFreshThrough)}</span>
-        <button onClick={function(){dlCSV(OPS_INSIGHTS.redFlags.categories.map(function(c){return {category:c.category,count:c.count};}),"red-flag-categories-"+todayStr()+".csv");}} style={{display:"flex",alignItems:"center",gap:5,background:th.inputBg,border:"1px solid "+th.borderPlain,borderRadius:20,padding:"7px 14px",color:th.textMuted,fontSize:11,cursor:"pointer"}}><i className="ti ti-download" style={{fontSize:13}} aria-hidden="true"/>Export CSV</button>
+        <button onClick={function(){dlCSV(ow.redFlags.categories.map(function(c){return {category:c.category,count:c.count};}),"red-flag-categories-"+(owIsAll?"all":fltDays+"d")+"-"+todayStr()+".csv");}} style={{display:"flex",alignItems:"center",gap:5,background:th.inputBg,border:"1px solid "+th.borderPlain,borderRadius:20,padding:"7px 14px",color:th.textMuted,fontSize:11,cursor:"pointer"}}><i className="ti ti-download" style={{fontSize:13}} aria-hidden="true"/>Export CSV</button>
       </div>
 
       {/* Live KPIs vs period — range control + period-over-period deltas + targets/RAG (Increment 2) */}
@@ -1830,8 +1841,8 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(330px,1fr))",gap:10}}>
         <div style={glass}>
           <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Red-flag categories</p>
-          <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>{OPS_INSIGHTS.redFlags.total.toLocaleString()} flags across {OPS_INSIGHTS.redFlags.records.toLocaleString()} jobs</p>
-          <BarChart th={th} color={cc.red} data={OPS_INSIGHTS.redFlags.categories.map(function(c){return {label:c.category.replace(/_/g," "),value:c.count};})}/>
+          <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>{ow.redFlags.total.toLocaleString()} flags across {ow.redFlags.records.toLocaleString()} jobs &middot; {owLabel}</p>
+          <BarChart th={th} color={cc.red} data={ow.redFlags.categories.map(function(c){return {label:c.category.replace(/_/g," "),value:c.count};})}/>
         </div>
 
         <div style={glass}>
@@ -1842,8 +1853,8 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
 
         <div style={glass}>
           <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Cycle times (median days)</p>
-          <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Days between milestones</p>
-          <BarChart th={th} color={cc.blue} format="days" data={OPS_INSIGHTS.cycleTimes.filter(function(c){return c.median!=null;}).map(function(c){return {label:c.label,value:c.median};})}/>
+          <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Days between milestones &middot; {owLabel}</p>
+          <BarChart th={th} color={cc.blue} format="days" data={ow.cycleTimes.filter(function(c){return c.median!=null;}).map(function(c){return {label:c.label,value:c.median};})}/>
         </div>
 
         <div style={glass}>
