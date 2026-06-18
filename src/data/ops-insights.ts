@@ -45,56 +45,152 @@ export const OPS_INSIGHTS = {
     "records": 11395,
     "categories": [
       {
-        "category": "documentation_blocker",
-        "count": 5127
+        "category": "Documentation & contract",
+        "count": 5797,
+        "subcategories": [
+          {
+            "category": "documentation_blocker",
+            "count": 5797
+          }
+        ]
       },
       {
-        "category": "stall_delay",
-        "count": 2725
+        "category": "System, equipment & service",
+        "count": 3845,
+        "subcategories": [
+          {
+            "category": "system_performance",
+            "count": 2350
+          },
+          {
+            "category": "equipment_failure",
+            "count": 692
+          },
+          {
+            "category": "service_warranty",
+            "count": 443
+          },
+          {
+            "category": "technical_issue",
+            "count": 360
+          }
+        ]
       },
       {
-        "category": "system_performance",
-        "count": 2657
+        "category": "Customer",
+        "count": 2772,
+        "subcategories": [
+          {
+            "category": "customer_communication",
+            "count": 1665
+          },
+          {
+            "category": "customer_complaint",
+            "count": 1049
+          },
+          {
+            "category": "legal_fraud",
+            "count": 58
+          }
+        ]
       },
       {
-        "category": "cancellation",
-        "count": 2316
+        "category": "Cancellation",
+        "count": 2320,
+        "subcategories": [
+          {
+            "category": "cancellation",
+            "count": 2320
+          }
+        ]
       },
       {
-        "category": "financing",
-        "count": 1582
+        "category": "Financing & payment",
+        "count": 2060,
+        "subcategories": [
+          {
+            "category": "financing",
+            "count": 2060
+          }
+        ]
       },
       {
-        "category": "inspection_failure",
-        "count": 979
+        "category": "Stalls & scheduling",
+        "count": 1775,
+        "subcategories": [
+          {
+            "category": "stall_delay",
+            "count": 1359
+          },
+          {
+            "category": "scheduling",
+            "count": 416
+          }
+        ]
       },
       {
-        "category": "customer_complaint",
-        "count": 905
+        "category": "Installation & site",
+        "count": 1607,
+        "subcategories": [
+          {
+            "category": "installation_issue",
+            "count": 1095
+          },
+          {
+            "category": "site_structural",
+            "count": 512
+          }
+        ]
       },
       {
-        "category": "installation_issue",
-        "count": 872
+        "category": "Design & engineering",
+        "count": 1032,
+        "subcategories": [
+          {
+            "category": "design_engineering",
+            "count": 1032
+          }
+        ]
       },
       {
-        "category": "permitting",
-        "count": 335
+        "category": "Inspection",
+        "count": 1002,
+        "subcategories": [
+          {
+            "category": "inspection_failure",
+            "count": 1002
+          }
+        ]
       },
       {
-        "category": "utility_interconnection",
-        "count": 310
+        "category": "Permitting & compliance",
+        "count": 925,
+        "subcategories": [
+          {
+            "category": "permitting_compliance",
+            "count": 925
+          }
+        ]
       },
       {
-        "category": "technical_issue",
-        "count": 221
+        "category": "Utility / interconnection",
+        "count": 561,
+        "subcategories": [
+          {
+            "category": "utility_interconnection",
+            "count": 561
+          }
+        ]
       },
       {
-        "category": "customer_concern",
-        "count": 194
-      },
-      {
-        "category": "other",
-        "count": 5994
+        "category": "Other",
+        "count": 521,
+        "subcategories": [
+          {
+            "category": "other",
+            "count": 521
+          }
+        ]
       }
     ]
   },
@@ -317,56 +413,152 @@ export const OPS_INSIGHTS = {
         "records": 351,
         "categories": [
           {
-            "category": "documentation_blocker",
-            "count": 205
+            "category": "Documentation & contract",
+            "count": 213,
+            "subcategories": [
+              {
+                "category": "documentation_blocker",
+                "count": 213
+              }
+            ]
           },
           {
-            "category": "system_performance",
-            "count": 69
+            "category": "System, equipment & service",
+            "count": 121,
+            "subcategories": [
+              {
+                "category": "system_performance",
+                "count": 68
+              },
+              {
+                "category": "technical_issue",
+                "count": 23
+              },
+              {
+                "category": "equipment_failure",
+                "count": 21
+              },
+              {
+                "category": "service_warranty",
+                "count": 9
+              }
+            ]
           },
           {
-            "category": "stall_delay",
-            "count": 60
+            "category": "Customer",
+            "count": 65,
+            "subcategories": [
+              {
+                "category": "customer_communication",
+                "count": 39
+              },
+              {
+                "category": "customer_complaint",
+                "count": 24
+              },
+              {
+                "category": "legal_fraud",
+                "count": 2
+              }
+            ]
           },
           {
-            "category": "cancellation",
-            "count": 49
+            "category": "Installation & site",
+            "count": 50,
+            "subcategories": [
+              {
+                "category": "installation_issue",
+                "count": 39
+              },
+              {
+                "category": "site_structural",
+                "count": 11
+              }
+            ]
           },
           {
-            "category": "financing",
-            "count": 37
+            "category": "Design & engineering",
+            "count": 49,
+            "subcategories": [
+              {
+                "category": "design_engineering",
+                "count": 49
+              }
+            ]
           },
           {
-            "category": "inspection_failure",
-            "count": 29
+            "category": "Financing & payment",
+            "count": 49,
+            "subcategories": [
+              {
+                "category": "financing",
+                "count": 49
+              }
+            ]
           },
           {
-            "category": "installation_issue",
-            "count": 25
+            "category": "Cancellation",
+            "count": 49,
+            "subcategories": [
+              {
+                "category": "cancellation",
+                "count": 49
+              }
+            ]
           },
           {
-            "category": "customer_complaint",
-            "count": 19
+            "category": "Stalls & scheduling",
+            "count": 40,
+            "subcategories": [
+              {
+                "category": "stall_delay",
+                "count": 33
+              },
+              {
+                "category": "scheduling",
+                "count": 7
+              }
+            ]
           },
           {
-            "category": "technical_issue",
-            "count": 17
+            "category": "Permitting & compliance",
+            "count": 37,
+            "subcategories": [
+              {
+                "category": "permitting_compliance",
+                "count": 37
+              }
+            ]
           },
           {
-            "category": "permitting",
-            "count": 16
+            "category": "Inspection",
+            "count": 29,
+            "subcategories": [
+              {
+                "category": "inspection_failure",
+                "count": 29
+              }
+            ]
           },
           {
-            "category": "customer_concern",
-            "count": 8
+            "category": "Other",
+            "count": 25,
+            "subcategories": [
+              {
+                "category": "other",
+                "count": 25
+              }
+            ]
           },
           {
-            "category": "utility_interconnection",
-            "count": 7
-          },
-          {
-            "category": "other",
-            "count": 194
+            "category": "Utility / interconnection",
+            "count": 8,
+            "subcategories": [
+              {
+                "category": "utility_interconnection",
+                "count": 8
+              }
+            ]
           }
         ]
       },
@@ -421,56 +613,152 @@ export const OPS_INSIGHTS = {
         "records": 853,
         "categories": [
           {
-            "category": "documentation_blocker",
-            "count": 532
+            "category": "Documentation & contract",
+            "count": 560,
+            "subcategories": [
+              {
+                "category": "documentation_blocker",
+                "count": 560
+              }
+            ]
           },
           {
-            "category": "system_performance",
-            "count": 290
+            "category": "System, equipment & service",
+            "count": 404,
+            "subcategories": [
+              {
+                "category": "system_performance",
+                "count": 264
+              },
+              {
+                "category": "technical_issue",
+                "count": 52
+              },
+              {
+                "category": "equipment_failure",
+                "count": 51
+              },
+              {
+                "category": "service_warranty",
+                "count": 37
+              }
+            ]
           },
           {
-            "category": "stall_delay",
-            "count": 208
+            "category": "Customer",
+            "count": 211,
+            "subcategories": [
+              {
+                "category": "customer_communication",
+                "count": 118
+              },
+              {
+                "category": "customer_complaint",
+                "count": 88
+              },
+              {
+                "category": "legal_fraud",
+                "count": 5
+              }
+            ]
           },
           {
-            "category": "cancellation",
-            "count": 148
+            "category": "Financing & payment",
+            "count": 165,
+            "subcategories": [
+              {
+                "category": "financing",
+                "count": 165
+              }
+            ]
           },
           {
-            "category": "financing",
-            "count": 110
+            "category": "Installation & site",
+            "count": 159,
+            "subcategories": [
+              {
+                "category": "installation_issue",
+                "count": 109
+              },
+              {
+                "category": "site_structural",
+                "count": 50
+              }
+            ]
           },
           {
-            "category": "inspection_failure",
-            "count": 82
+            "category": "Cancellation",
+            "count": 148,
+            "subcategories": [
+              {
+                "category": "cancellation",
+                "count": 148
+              }
+            ]
           },
           {
-            "category": "customer_complaint",
-            "count": 78
+            "category": "Stalls & scheduling",
+            "count": 133,
+            "subcategories": [
+              {
+                "category": "stall_delay",
+                "count": 103
+              },
+              {
+                "category": "scheduling",
+                "count": 30
+              }
+            ]
           },
           {
-            "category": "installation_issue",
-            "count": 67
+            "category": "Design & engineering",
+            "count": 100,
+            "subcategories": [
+              {
+                "category": "design_engineering",
+                "count": 100
+              }
+            ]
           },
           {
-            "category": "technical_issue",
-            "count": 33
+            "category": "Permitting & compliance",
+            "count": 91,
+            "subcategories": [
+              {
+                "category": "permitting_compliance",
+                "count": 91
+              }
+            ]
           },
           {
-            "category": "permitting",
-            "count": 29
+            "category": "Inspection",
+            "count": 86,
+            "subcategories": [
+              {
+                "category": "inspection_failure",
+                "count": 86
+              }
+            ]
           },
           {
-            "category": "utility_interconnection",
-            "count": 28
+            "category": "Other",
+            "count": 70,
+            "subcategories": [
+              {
+                "category": "other",
+                "count": 70
+              }
+            ]
           },
           {
-            "category": "customer_concern",
-            "count": 21
-          },
-          {
-            "category": "other",
-            "count": 546
+            "category": "Utility / interconnection",
+            "count": 45,
+            "subcategories": [
+              {
+                "category": "utility_interconnection",
+                "count": 45
+              }
+            ]
           }
         ]
       },
@@ -525,56 +813,152 @@ export const OPS_INSIGHTS = {
         "records": 1419,
         "categories": [
           {
-            "category": "documentation_blocker",
-            "count": 1011
+            "category": "Documentation & contract",
+            "count": 1065,
+            "subcategories": [
+              {
+                "category": "documentation_blocker",
+                "count": 1065
+              }
+            ]
           },
           {
-            "category": "system_performance",
-            "count": 472
+            "category": "System, equipment & service",
+            "count": 695,
+            "subcategories": [
+              {
+                "category": "system_performance",
+                "count": 424
+              },
+              {
+                "category": "equipment_failure",
+                "count": 113
+              },
+              {
+                "category": "technical_issue",
+                "count": 97
+              },
+              {
+                "category": "service_warranty",
+                "count": 61
+              }
+            ]
           },
           {
-            "category": "stall_delay",
-            "count": 378
+            "category": "Customer",
+            "count": 394,
+            "subcategories": [
+              {
+                "category": "customer_communication",
+                "count": 222
+              },
+              {
+                "category": "customer_complaint",
+                "count": 166
+              },
+              {
+                "category": "legal_fraud",
+                "count": 6
+              }
+            ]
           },
           {
-            "category": "cancellation",
-            "count": 292
+            "category": "Financing & payment",
+            "count": 317,
+            "subcategories": [
+              {
+                "category": "financing",
+                "count": 317
+              }
+            ]
           },
           {
-            "category": "financing",
-            "count": 222
+            "category": "Installation & site",
+            "count": 301,
+            "subcategories": [
+              {
+                "category": "installation_issue",
+                "count": 208
+              },
+              {
+                "category": "site_structural",
+                "count": 93
+              }
+            ]
           },
           {
-            "category": "inspection_failure",
-            "count": 188
+            "category": "Cancellation",
+            "count": 292,
+            "subcategories": [
+              {
+                "category": "cancellation",
+                "count": 292
+              }
+            ]
           },
           {
-            "category": "installation_issue",
-            "count": 148
+            "category": "Stalls & scheduling",
+            "count": 238,
+            "subcategories": [
+              {
+                "category": "stall_delay",
+                "count": 179
+              },
+              {
+                "category": "scheduling",
+                "count": 59
+              }
+            ]
           },
           {
-            "category": "customer_complaint",
-            "count": 140
+            "category": "Inspection",
+            "count": 194,
+            "subcategories": [
+              {
+                "category": "inspection_failure",
+                "count": 194
+              }
+            ]
           },
           {
-            "category": "utility_interconnection",
-            "count": 66
+            "category": "Permitting & compliance",
+            "count": 192,
+            "subcategories": [
+              {
+                "category": "permitting_compliance",
+                "count": 192
+              }
+            ]
           },
           {
-            "category": "technical_issue",
-            "count": 63
+            "category": "Design & engineering",
+            "count": 178,
+            "subcategories": [
+              {
+                "category": "design_engineering",
+                "count": 178
+              }
+            ]
           },
           {
-            "category": "permitting",
-            "count": 56
+            "category": "Other",
+            "count": 111,
+            "subcategories": [
+              {
+                "category": "other",
+                "count": 111
+              }
+            ]
           },
           {
-            "category": "customer_concern",
-            "count": 40
-          },
-          {
-            "category": "other",
-            "count": 1011
+            "category": "Utility / interconnection",
+            "count": 110,
+            "subcategories": [
+              {
+                "category": "utility_interconnection",
+                "count": 110
+              }
+            ]
           }
         ]
       },
@@ -629,56 +1013,152 @@ export const OPS_INSIGHTS = {
         "records": 2599,
         "categories": [
           {
-            "category": "documentation_blocker",
-            "count": 1876
+            "category": "Documentation & contract",
+            "count": 2046,
+            "subcategories": [
+              {
+                "category": "documentation_blocker",
+                "count": 2046
+              }
+            ]
           },
           {
-            "category": "system_performance",
-            "count": 888
+            "category": "System, equipment & service",
+            "count": 1336,
+            "subcategories": [
+              {
+                "category": "system_performance",
+                "count": 778
+              },
+              {
+                "category": "equipment_failure",
+                "count": 240
+              },
+              {
+                "category": "technical_issue",
+                "count": 185
+              },
+              {
+                "category": "service_warranty",
+                "count": 133
+              }
+            ]
           },
           {
-            "category": "stall_delay",
-            "count": 745
+            "category": "Customer",
+            "count": 814,
+            "subcategories": [
+              {
+                "category": "customer_communication",
+                "count": 488
+              },
+              {
+                "category": "customer_complaint",
+                "count": 313
+              },
+              {
+                "category": "legal_fraud",
+                "count": 13
+              }
+            ]
           },
           {
-            "category": "cancellation",
-            "count": 664
+            "category": "Financing & payment",
+            "count": 763,
+            "subcategories": [
+              {
+                "category": "financing",
+                "count": 763
+              }
+            ]
           },
           {
-            "category": "financing",
-            "count": 572
+            "category": "Cancellation",
+            "count": 666,
+            "subcategories": [
+              {
+                "category": "cancellation",
+                "count": 666
+              }
+            ]
           },
           {
-            "category": "inspection_failure",
-            "count": 351
+            "category": "Installation & site",
+            "count": 612,
+            "subcategories": [
+              {
+                "category": "installation_issue",
+                "count": 415
+              },
+              {
+                "category": "site_structural",
+                "count": 197
+              }
+            ]
           },
           {
-            "category": "installation_issue",
-            "count": 317
+            "category": "Stalls & scheduling",
+            "count": 467,
+            "subcategories": [
+              {
+                "category": "stall_delay",
+                "count": 337
+              },
+              {
+                "category": "scheduling",
+                "count": 130
+              }
+            ]
           },
           {
-            "category": "customer_complaint",
-            "count": 268
+            "category": "Design & engineering",
+            "count": 425,
+            "subcategories": [
+              {
+                "category": "design_engineering",
+                "count": 425
+              }
+            ]
           },
           {
-            "category": "permitting",
-            "count": 125
+            "category": "Permitting & compliance",
+            "count": 374,
+            "subcategories": [
+              {
+                "category": "permitting_compliance",
+                "count": 374
+              }
+            ]
           },
           {
-            "category": "utility_interconnection",
-            "count": 114
+            "category": "Inspection",
+            "count": 363,
+            "subcategories": [
+              {
+                "category": "inspection_failure",
+                "count": 363
+              }
+            ]
           },
           {
-            "category": "technical_issue",
-            "count": 112
+            "category": "Other",
+            "count": 212,
+            "subcategories": [
+              {
+                "category": "other",
+                "count": 212
+              }
+            ]
           },
           {
-            "category": "customer_concern",
-            "count": 77
-          },
-          {
-            "category": "other",
-            "count": 2169
+            "category": "Utility / interconnection",
+            "count": 200,
+            "subcategories": [
+              {
+                "category": "utility_interconnection",
+                "count": 200
+              }
+            ]
           }
         ]
       },

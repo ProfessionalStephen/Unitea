@@ -1131,6 +1131,8 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
   // Notes-extracted insight charts (red flags, cycle times) honour the active date range via per-window
   // buckets in OPS_INSIGHTS.windows; "All" (730) and any non-bucketed range fall back to all-time figures.
   function opsWin(days){var w=OPS_INSIGHTS.windows&&OPS_INSIGHTS.windows[String(days)];return w||{redFlags:OPS_INSIGHTS.redFlags,cycleTimes:OPS_INSIGHTS.cycleTimes};}
+  // Red-flag rows: label = display group, value = group total, tip = fine-category breakdown (hover).
+  function rfChartData(cats){return (cats||[]).map(function(c){var subs=c.subcategories||[];return {label:String(c.category).replace(/_/g," "),value:c.count,tip:String(c.category)+": "+Number(c.count).toLocaleString()+" flags"+(subs.length?"\n"+subs.map(function(s){return "  • "+String(s.category).replace(/_/g," ")+": "+Number(s.count).toLocaleString();}).join("\n"):"")};});}
   var ow=opsWin(fltDays);
   var owIsAll=!(OPS_INSIGHTS.windows&&OPS_INSIGHTS.windows[String(fltDays)]);
   var owLabel=owIsAll?"all-time":"last "+((RANGE_OPTS.find(function(o){return o.d===fltDays;})||{l:fltDays+"d"}).l);
@@ -1619,7 +1621,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
         <div style={glass}>
           <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Top red-flag categories</p>
           <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>{ow.redFlags.total.toLocaleString()} flags &middot; {owLabel}</p>
-          <BarChart th={th} color={cc.red} data={ow.redFlags.categories.slice(0,6).map(function(c){return {label:c.category.replace(/_/g," "),value:c.count};})}/>
+          <BarChart th={th} color={cc.red} data={rfChartData(ow.redFlags.categories.slice(0,6))}/>
         </div>
         <div style={glass}>
           <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Active pipeline by board {pd.isLive?"":"(simulated)"}</p>
@@ -1842,7 +1844,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
         <div style={glass}>
           <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Red-flag categories</p>
           <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>{ow.redFlags.total.toLocaleString()} flags across {ow.redFlags.records.toLocaleString()} jobs &middot; {owLabel}</p>
-          <BarChart th={th} color={cc.red} data={ow.redFlags.categories.map(function(c){return {label:c.category.replace(/_/g," "),value:c.count};})}/>
+          <BarChart th={th} color={cc.red} data={rfChartData(ow.redFlags.categories)}/>
         </div>
 
         <div style={glass}>
