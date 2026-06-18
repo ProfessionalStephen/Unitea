@@ -77,16 +77,48 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const authorized = authHeader === `Bearer ${cronSecret}` || queryKey === cronSecret;
   if (!authorized) return res.status(401).json({ error: "Unauthorized" });
 
-  // ── PAUSE GATE ──
-  // Set EMAILS_PAUSED=true in Vercel env vars to block all sends.
-  // Cron still fires but exits cleanly without contacting recipients.
+  // ── DAILY SNAPSHOT (decoupled from email delivery) ──
+  // Capture a Pipedrive snapshot on EVERY authorized cron run — BEFORE the pause/
+  // test gates below. History must NOT depend on whether briefing emails are sent:
+  // pausing emails (EMAILS_PAUSED) or running a test (CRON_TEST_RECIPIENT) used to
+  // skip the snapshot entirely, which silently dropped the day's data point and is
+  // why the trend had no history. Now the snapshot always runs first; failures here
+  // never block the run.
+  const apiKey = process.env.PIPEDRIVE_API_KEY;
+  const domain = process.env.PIPEDRIVE_DOMAIN;
+  let pipelineData: any = null;
+  let dataSource: "live" | "simulated" = "simulated";
+  if (apiKey && domain) {
+    try {
+      pipelineData = await pullPipedrive(domain, apiKey);
+      dataSource = "live";
+    } catch (e: any) {
+      console.error("Pipedrive pull failed:", e?.message);
+    }
+  }
+  let snapshotResult: { date: string; pathname: string; bytes: number } | { error: string } | null = null;
+  if (dataSource === "live" && pipelineData) {
+    try {
+      const entry = await writeSnapshot(pipelineData, dataSource);
+      snapshotResult = { date: entry.date, pathname: entry.pathname, bytes: entry.size };
+    } catch (e: any) {
+      console.error("Snapshot write failed:", e?.message);
+      snapshotResult = { error: e?.message || "snapshot write failed" };
+    }
+  }
+
+  // ── PAUSE GATE (emails only) ──
+  // Set EMAILS_PAUSED=true in Vercel env vars to block all sends. The cron still
+  // fires and (above) still captures the daily snapshot — it just exits without
+  // emailing recipients.
   const paused = String(process.env.EMAILS_PAUSED || "").toLowerCase() === "true";
   if (paused) {
     const pausedSummary = {
       success: true,
       paused: true,
       timestamp: new Date().toISOString(),
-      message: "EMAILS_PAUSED=true — cron fired but no emails sent. Unset env var to resume.",
+      snapshot: snapshotResult,
+      message: "EMAILS_PAUSED=true — cron fired, snapshot captured, no emails sent. Unset env var to resume sends.",
     };
     console.log("[cron/send-briefings]", JSON.stringify(pausedSummary));
     return res.status(200).json(pausedSummary);
@@ -105,33 +137,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
-  const apiKey = process.env.PIPEDRIVE_API_KEY;
-  const domain = process.env.PIPEDRIVE_DOMAIN;
-  let pipelineData: any = null;
-  let dataSource: "live" | "simulated" = "simulated";
-
-  if (apiKey && domain) {
-    try {
-      pipelineData = await pullPipedrive(domain, apiKey);
-      dataSource = "live";
-    } catch (e: any) {
-      console.error("Pipedrive pull failed:", e?.message);
-    }
-  }
-
-  // Write daily snapshot before sending emails. Skips on test runs
-  // (CRON_TEST_RECIPIENT) and on simulated data — we only snapshot
-  // real Pipedrive state. Failures here must not block email sends.
-  let snapshotResult: { date: string; pathname: string; bytes: number } | { error: string } | null = null;
-  if (dataSource === "live" && pipelineData && !testRecipient) {
-    try {
-      const entry = await writeSnapshot(pipelineData, dataSource);
-      snapshotResult = { date: entry.date, pathname: entry.pathname, bytes: entry.size };
-    } catch (e: any) {
-      console.error("Snapshot write failed:", e?.message);
-      snapshotResult = { error: e?.message || "snapshot write failed" };
-    }
-  }
+  // Pipedrive pull + daily snapshot already ran above (before the pause gate), so
+  // history is captured even on paused/test runs. pipelineData/dataSource/snapshotResult
+  // are reused here for the email build below.
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;

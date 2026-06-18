@@ -28,7 +28,7 @@ import { dmy, dmyTime, monthYear } from "./format";
 // semantic tokens, so every existing inline style is now token-backed and the theme switches via a
 // class on the root (.theme-dark / .theme-light) — no per-object swap. Gate-verified (design/foundation*).
 const TH={bg:"var(--bg-canvas)",card:"var(--bg-surface)",cardSolid:"var(--bg-surface)",border:"var(--border-subtle)",borderPlain:"var(--border-subtle)",text:"var(--fg-default)",textMuted:"var(--fg-muted)",inputBg:"var(--input-bg)",inputBorder:"var(--input-border)",tabBg:"var(--bg-component)",tabBorder:"var(--border-subtle)",selectText:"var(--fg-default)",selectBg:"var(--bg-component)"};
-const C={orange:"#F28F1D",orangeDeep:"#D4721A",green:"#22C55E",amber:"#F59E0B",red:"#EF4444",blue:"#1D6FB5",purple:"#A855F7"};
+const C={orange:"#F28F1D",orangeDeep:"#D9511C",green:"#22C55E",amber:"#F59E0B",red:"#EF4444",blue:"#1D6FB5",purple:"#A855F7"};
 
 // BOARDS + INDUSTRY_BENCHMARK_DAYS imported from ../shared/domain
 
@@ -419,7 +419,7 @@ function UniLogo(){return <img src="/Unicity_Solar_Logo_only.png" alt="Unicity S
 function Avatar({name,size=36}){var ini=name.split(" ").map(function(w){return w[0];}).join("").slice(0,2).toUpperCase();var bg=name.charCodeAt(0)%2===0?C.orange:C.blue;return <div style={{width:size,height:size,borderRadius:"50%",background:bg,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:500,fontSize:size*0.33,flexShrink:0,border:"2px solid "+bg+"44"}}>{ini}</div>;}
 function Pill({text,color="orange",size=11}){var fg=color==="green"?C.green:color==="red"?C.red:color==="amber"?C.amber:color==="blue"?C.blue:color==="purple"?C.purple:C.orange;return <span style={{background:fg+"18",color:fg,border:"1px solid "+fg+"44",fontSize:size,fontWeight:500,padding:"3px 8px",borderRadius:20,whiteSpace:"nowrap"}}>{text}</span>;}
 function SLabel({icon,text}){return <p style={{fontSize:12,fontWeight:500,color:C.orange,letterSpacing:"0.4px",margin:"0 0 10px",display:"flex",alignItems:"center",gap:6}}><i className={"ti "+icon} aria-hidden="true"/>{text}</p>;}
-function SubTab({tabs,active,onChange,th}){return <div style={{display:"flex",gap:4,marginBottom:"1.25rem",background:th.tabBg,border:"1px solid "+th.tabBorder,borderRadius:12,padding:3}}>{tabs.map(function(t){return <button key={t} onClick={function(){onChange(t);}} style={{flex:1,padding:"7px 4px",border:"none",borderRadius:9,background:active===t?C.orange+"22":"transparent",color:active===t?C.orange:th.textMuted,fontWeight:active===t?500:400,fontSize:12,cursor:"pointer"}}>{t}</button>;})}</div>;}
+function SubTab({tabs,active,onChange,th}){return <div style={{display:"flex",gap:4,marginBottom:"1.25rem",background:th.tabBg,border:"1px solid "+th.tabBorder,borderRadius:10,padding:3}}>{tabs.map(function(t){return <button key={t} onClick={function(){onChange(t);}} style={{flex:1,padding:"7px 10px",border:"none",borderRadius:8,background:active===t?C.orange+"22":"transparent",color:active===t?C.orange:th.textMuted,fontWeight:active===t?500:400,fontSize:12,cursor:"pointer"}}>{t}</button>;})}</div>;}
 function SDot({on}){return <span style={{display:"inline-block",width:8,height:8,borderRadius:"50%",background:on?C.green:C.orange,boxShadow:on?"0 0 6px "+C.green:"0 0 6px "+C.orange,marginRight:6}}/>;}
 function RBadge({role}){var t=RT[role];var fg=t?t.color:"#897C80";return <span style={{background:fg+"18",color:fg,border:"1px solid "+fg+"44",fontSize:11,fontWeight:500,padding:"2px 8px",borderRadius:20,whiteSpace:"nowrap"}}>{role}</span>;}
 
@@ -1503,7 +1503,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
       </div>
       {NAV_GROUPS.map(function(g){var items=g.items.filter(function(id){return TABS.some(function(t){return t.id===id;});});if(!items.length)return null;return <div key={g.label||"top"}>
         {g.label?<div style={{fontSize:10,letterSpacing:"0.8px",color:th.textMuted,padding:"10px 8px 4px",textTransform:"uppercase" as const}}>{g.label}</div>:null}
-        {items.map(function(id){var a=tab===id;return <button key={id} onClick={function(){setTab(id);}} style={{width:"100%",display:"flex",alignItems:"center",gap:9,padding:"8px 9px",border:"none",borderRadius:8,background:a?C.orange+"24":"transparent",color:a?C.orange:th.text,fontWeight:a?500:400,fontSize:12.5,cursor:"pointer",textAlign:"left" as const,marginBottom:1}}>
+        {items.map(function(id){var a=tab===id;return <button key={id} onClick={function(){setTab(id);}} style={{width:"100%",display:"flex",alignItems:"center",gap:9,padding:"8px 10px",border:"none",borderRadius:8,background:a?C.orange+"22":"transparent",color:a?C.orange:th.text,fontWeight:a?500:400,fontSize:12.5,cursor:"pointer",textAlign:"left" as const,marginBottom:1}}>
           <i className={"ti "+ICON_OF[id]} style={{fontSize:16,flexShrink:0}} aria-hidden="true"/>{id}
         </button>;})}
       </div>;})}
@@ -1569,8 +1569,8 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
       {/* Reporting controls — date range + region + shareable link (PR-A) */}
       <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:14}}>
         <span style={{fontSize:11,color:th.textMuted}}>Range</span>
-        <div style={{display:"flex",gap:4,background:th.bg,border:"1px solid "+th.borderPlain,borderRadius:9,padding:3}}>
-          {RANGE_OPTS.map(function(o){var a=fltDays===o.d;return <button key={o.d} onClick={function(){setFltDays(o.d);}} style={{fontSize:11,padding:"5px 10px",borderRadius:6,border:"none",cursor:"pointer",background:a?C.orange:"transparent",color:a?"#1a1209":th.textMuted,fontWeight:a?500:400}}>{o.l}</button>;})}
+        <div style={{display:"flex",gap:4,background:th.tabBg,border:"1px solid "+th.borderPlain,borderRadius:10,padding:3}}>
+          {RANGE_OPTS.map(function(o){var a=fltDays===o.d;return <button key={o.d} onClick={function(){setFltDays(o.d);}} style={{fontSize:11,padding:"6px 11px",borderRadius:8,border:"none",cursor:"pointer",background:a?C.orange+"22":"transparent",color:a?C.orange:th.textMuted,fontWeight:a?500:400}}>{o.l}</button>;})}
         </div>
         <span style={{fontSize:11,color:th.textMuted,marginLeft:6}}>Region</span>
         <select value={fltRegion} onChange={function(e){setFltRegion(e.target.value);}} style={Object.assign({},iS,{padding:"6px 9px"})}>
@@ -1603,7 +1603,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
           <p style={{margin:0,fontSize:12,color:th.textMuted,textAlign:"center",padding:"1.5rem 0"}}>Loading trend…</p>
         :seriesInfo.status==="ok"&&seriesInfo.series&&seriesInfo.series.length>1?
           <LineChart th={th} color={cc.blue} height={220} format={trendMetric==="totalPipelineValue"?"money":trendMetric==="cancellationRate30d"?"pct":trendMetric==="endToEndDays"?"days":"int"} data={seriesInfo.series.map(function(row){return {label:dmShort(row.date),value:row[trendMetric]};})}/>
-        :<div style={{textAlign:"center",padding:"1.5rem 0"}}><p style={{margin:"0 0 4px",fontSize:13,color:th.text}}>Trend builds as daily snapshots accumulate</p><p style={{margin:0,fontSize:11,color:th.textMuted}}>{seriesInfo.series&&seriesInfo.series.length===1?"Only one snapshot so far — need ≥2 points.":"No snapshots in this range yet."}</p></div>}
+        :<div style={{textAlign:"center",padding:"1.5rem 0"}}><p style={{margin:"0 0 4px",fontSize:13,color:th.text}}>Trend builds as daily snapshots accumulate</p><p style={{margin:0,fontSize:11,color:th.textMuted}}>{seriesInfo.status==="no_snapshots"?"No snapshots captured yet — the nightly sync now records one every run, so history starts filling from the next run.":seriesInfo.series&&seriesInfo.series.length===1?"Only one snapshot so far ("+seriesInfo.series[0].date+") — need ≥2 points to draw a line.":"No snapshots in this range yet — try a wider range."}</p></div>}
       </div>
       <div style={{display:"grid",gridTemplateColumns:"minmax(280px,360px) 1fr",gap:12,marginBottom:12}}>
         <div style={glass}>
@@ -1770,8 +1770,8 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:"1rem",flexWrap:"wrap"}}>
         <p style={{margin:0,fontSize:13,color:th.textMuted,flex:1}}>Visual KPI reports. Live pipeline from Pipedrive; operational insights from the notes-extraction pipeline.</p>
         <span style={{fontSize:11,color:th.textMuted}}>Insights range</span>
-        <div style={{display:"flex",gap:4,background:th.bg,border:"1px solid "+th.borderPlain,borderRadius:9,padding:3}}>
-          {RANGE_OPTS.map(function(o){var a=fltDays===o.d;return <button key={o.d} onClick={function(){setFltDays(o.d);}} style={{fontSize:11,padding:"5px 10px",borderRadius:6,border:"none",cursor:"pointer",background:a?C.orange:"transparent",color:a?"#1a1209":th.textMuted,fontWeight:a?500:400}}>{o.l}</button>;})}
+        <div style={{display:"flex",gap:4,background:th.tabBg,border:"1px solid "+th.borderPlain,borderRadius:10,padding:3}}>
+          {RANGE_OPTS.map(function(o){var a=fltDays===o.d;return <button key={o.d} onClick={function(){setFltDays(o.d);}} style={{fontSize:11,padding:"6px 11px",borderRadius:8,border:"none",cursor:"pointer",background:a?C.orange+"22":"transparent",color:a?C.orange:th.textMuted,fontWeight:a?500:400}}>{o.l}</button>;})}
         </div>
         <span style={{fontSize:11,color:th.textMuted,background:th.inputBg,border:"1px solid "+th.borderPlain,borderRadius:20,padding:"4px 10px"}}><i className="ti ti-clock" style={{fontSize:12,marginRight:4}} aria-hidden="true"/>Insights through {dmy(OPS_INSIGHTS.dataFreshThrough)}</span>
         <button onClick={function(){dlCSV(ow.redFlags.categories.map(function(c){return {category:c.category,count:c.count};}),"red-flag-categories-"+(owIsAll?"all":fltDays+"d")+"-"+todayStr()+".csv");}} style={{display:"flex",alignItems:"center",gap:5,background:th.inputBg,border:"1px solid "+th.borderPlain,borderRadius:20,padding:"7px 14px",color:th.textMuted,fontSize:11,cursor:"pointer"}}><i className="ti ti-download" style={{fontSize:13}} aria-hidden="true"/>Export CSV</button>

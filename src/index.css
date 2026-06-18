@@ -51,11 +51,9 @@
 }
 
 #root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
+  width: 100%;
+  margin: 0;
+  text-align: left;
   min-height: 100svh;
   display: flex;
   flex-direction: column;
@@ -64,6 +62,16 @@
 
 body {
   margin: 0;
+}
+
+/* Native <select> popups: theme the option list so it never renders white-on-white.
+   color-scheme drives the native dropdown chrome per active theme; the option rule
+   pins text/background to the current theme tokens (defined in tokens.css). */
+.theme-dark select { color-scheme: dark; }
+.theme-light select { color-scheme: light; }
+select option {
+  background: var(--bg-component);
+  color: var(--fg-default);
 }
 
 h1,
