@@ -1540,19 +1540,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
       </div>
     </div>
 
-    {/* Cron status banner — always visible, makes live/test/paused state unmissable */}
-    <CronStatusBanner status={cronStatus} th={th}/>
-
-    {/* Draft/Live banner */}
-    <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:"1rem",padding:"10px 16px",borderRadius:12,background:draft?C.amber+"12":C.green+"0d",border:"2px solid "+(draft?C.amber:C.green)+"44"}}>
-      <div style={{width:12,height:12,borderRadius:"50%",background:draft?C.amber:C.green,boxShadow:"0 0 10px "+(draft?C.amber:C.green),flexShrink:0}}/>
-      <div style={{flex:1}}>
-        <p style={{margin:0,fontSize:14,fontWeight:500,color:draft?C.amber:C.green}}>{draft?"Draft mode - changes are NOT live":"Live mode - 6am send is active"}</p>
-        <p style={{margin:0,fontSize:11,color:th.textMuted}}>{draft?draftChanges.length+" draft changes pending":"Last pushed: "+(audit.find(function(e){return e.action==="Pushed to live";})||{ts:"Never"}).ts}</p>
-      </div>
-      {draft?<button onClick={function(){setShowPush(true);}} style={{background:"linear-gradient(135deg,"+C.orange+","+C.orangeDeep+")",border:"none",borderRadius:10,color:"#fff",fontWeight:500,fontSize:12,padding:"9px 18px",cursor:"pointer",whiteSpace:"nowrap"}}>Push to live</button>
-      :<button onClick={switchToDraft} style={{background:C.amber+"18",border:"1px solid "+C.amber+"44",borderRadius:10,color:C.amber,fontWeight:500,fontSize:12,padding:"9px 18px",cursor:"pointer",whiteSpace:"nowrap"}}>Switch to draft</button>}
-    </div>
+    {/* Cron send-state + draft/live publish banners moved to the Setup page (System tab). */}
 
     <div style={{background:C.green+"0a",border:"1px solid "+C.green+"22",borderRadius:12,padding:"7px 14px",marginBottom:"1rem"}}>
       <p style={{margin:0,fontSize:12,color:C.green}}>Read-only mode. Pipedrive GET endpoints only. Google OAuth: gmail.send + gmail.readonly. No data is modified.</p>
@@ -1638,6 +1626,17 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
 
     {/* SETUP */}
     {isAdmin&&tab==="Setup"&&<div>
+      {/* Mode banners (relocated from the global header): cron send state + draft/live publish control */}
+      <CronStatusBanner status={cronStatus} th={th}/>
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:"1rem",padding:"10px 16px",borderRadius:12,background:draft?C.amber+"12":C.green+"0d",border:"2px solid "+(draft?C.amber:C.green)+"44"}}>
+        <div style={{width:12,height:12,borderRadius:"50%",background:draft?C.amber:C.green,boxShadow:"0 0 10px "+(draft?C.amber:C.green),flexShrink:0}}/>
+        <div style={{flex:1}}>
+          <p style={{margin:0,fontSize:14,fontWeight:500,color:draft?C.amber:C.green}}>{draft?"Draft mode - changes are NOT live":"Live mode - 6am send is active"}</p>
+          <p style={{margin:0,fontSize:11,color:th.textMuted}}>{draft?draftChanges.length+" draft changes pending":"Last pushed: "+(audit.find(function(e){return e.action==="Pushed to live";})||{ts:"Never"}).ts}</p>
+        </div>
+        {draft?<button onClick={function(){setShowPush(true);}} style={{background:"linear-gradient(135deg,"+C.orange+","+C.orangeDeep+")",border:"none",borderRadius:10,color:"#fff",fontWeight:500,fontSize:12,padding:"9px 18px",cursor:"pointer",whiteSpace:"nowrap"}}>Push to live</button>
+        :<button onClick={switchToDraft} style={{background:C.amber+"18",border:"1px solid "+C.amber+"44",borderRadius:10,color:C.amber,fontWeight:500,fontSize:12,padding:"9px 18px",cursor:"pointer",whiteSpace:"nowrap"}}>Switch to draft</button>}
+      </div>
       <SubTab tabs={["General","KPI Mapping","Pipedrive Fields"]} active={stab} onChange={setStab} th={th}/>
       {stab==="General"&&<div style={{display:"flex",flexDirection:"column",gap:"1rem"}}>
         <div style={glass}>
