@@ -32,10 +32,10 @@ export function BarChart(props: {
           <g key={d.label + i} onClick={onBarClick ? () => onBarClick(d.label) : undefined} style={onBarClick ? { cursor: "pointer" } : undefined}>
             <text x={labelW - 8} y={y + rowH / 2} textAnchor="end" dominantBaseline="middle"
               fontSize={12} fill={th.textMuted}>{truncLabel(d.label, labelChars)}
-              <title>{d.label}</title>
+              <title>{d.tip || d.label}</title>
             </text>
             <rect x={barX0} y={y + 5} width={w} height={rowH - 12} rx={3} fill={d.color || color}>
-              <title>{d.label}: {fmtNum(d.value, format)}</title>
+              <title>{d.tip || `${d.label}: ${fmtNum(d.value, format)}`}</title>
             </rect>
             <text x={barX0 + w + 6} y={y + rowH / 2} dominantBaseline="middle"
               fontSize={11.5} fill={th.text}>{fmtNum(d.value, format)}</text>

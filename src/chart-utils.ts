@@ -10,6 +10,7 @@ export interface Datum {
   label: string;
   value: number;
   color?: string;
+  tip?: string;   // optional multi-line hover tooltip (e.g. a group's sub-category breakdown)
 }
 export type NumFormat = "int" | "pct" | "days" | "money";
 
