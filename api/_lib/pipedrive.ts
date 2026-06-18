@@ -9,6 +9,8 @@
 // so resolveKpi() consumers don't have to re-query Pipedrive.
 // ─────────────────────────────────────────────────────────────
 
+import { terminalStageIds } from "../../shared/domain/terminal-stages.js";
+
 export type PipedriveDeal = {
   id: number;
   title: string;
@@ -281,6 +283,13 @@ export async function pullPipedrive(domain: string, apiKey: string): Promise<Pip
   // ── Aggregates ──
   const totalPipelineValue = openDeals.reduce((sum: number, d: any) => sum + Number(d.value || 0), 0);
 
+  // "Active jobs" = open deals NOT parked in a completed/terminal stage (PTO reached, cancellation
+  // processed, Mx invoice sent, job complete, serviced). Mirrors the solar pipeline's terminal-stage
+  // definition so the headline count is genuine field work (~hundreds), not the ~16k open backlog
+  // (which includes the Funding AR pile, PTO-paid, processed cancellations). See shared/domain/terminal-stages.ts.
+  const terminalIds = terminalStageIds(pipelinesArr as any[], stagesArr as any[]);
+  const activeOpenDeals = openDeals.filter((d: any) => !terminalIds.has(d.stage_id));
+
   const mondayYMD = startOfWeekETIso();
   const todayYMD = easternYMD();
   const thirtyDaysAgoYMD = nDaysAgoEt(30);
@@ -359,7 +368,7 @@ export async function pullPipedrive(domain: string, apiKey: string): Promise<Pip
     pipelines: pipelinesArr.map((p: any) => ({ id: p.id, name: p.name })),
     stalled,
     moved24h,
-    totalActiveJobs: openDeals.length,
+    totalActiveJobs: activeOpenDeals.length,
     totalPipelineValue,
     endToEndDays: Math.round(endToEndDays * 10) / 10,
     wonThisWeek, wonThisWeekValue, wonLast30d,
