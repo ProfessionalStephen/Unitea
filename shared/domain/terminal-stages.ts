@@ -48,3 +48,14 @@ export function terminalStageIds(pipelines: PipelineRef[], stages: StageRef[]): 
   }
   return ids;
 }
+
+/**
+ * Name-based check for callers that work with board + stage NAMES rather than live Pipedrive ids
+ * (e.g. the frontend's BOARDS config + boardData). Same source of truth as terminalStageIds.
+ */
+export function isTerminalStage(boardName: unknown, stageName: unknown): boolean {
+  const b = norm(boardName);
+  if (TERMINAL_BOARDS.has(b)) return true;
+  const names = TERMINAL_STAGE_MAP[b];
+  return !!names && names.indexOf(norm(stageName)) !== -1;
+}
