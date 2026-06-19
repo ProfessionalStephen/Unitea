@@ -1131,14 +1131,18 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
   var [trendMetric,setTrendMetric]=useState("totalActiveJobs");
   var [seriesInfo,setSeriesInfo]=useState({loading:false,status:null,series:null,error:null});
   var [copied,setCopied]=useState(false);
-  var RANGE_OPTS=[{d:30,l:"30d"},{d:90,l:"90d"},{d:180,l:"6mo"},{d:365,l:"1yr"},{d:730,l:"All"}];
+  var RANGE_OPTS=[{d:30,l:"30d"},{d:60,l:"60d"},{d:90,l:"90d"},{d:180,l:"6mo"},{d:365,l:"1yr"},{d:730,l:"All"}];
   var METRIC_LABELS={totalActiveJobs:"Active jobs",totalPipelineValue:"Pipeline value",endToEndDays:"End-to-end days",wonThisWeek:"Won this week",wonLast30d:"Won last 30d",lostLast30d:"Lost last 30d",cancellationRate30d:"Cancellation rate (30d)",activitiesOverdue:"Overdue activities",callsDueToday:"Calls due today",installsScheduledThisWeek:"Installs scheduled (wk)",permitsSubmittedThisWeek:"Permits submitted (wk)",nmaSubmittedThisWeek:"NMA submitted (wk)"};
   // Notes-extracted insight charts (red flags, cycle times) honour the active date range via per-window
   // buckets in OPS_INSIGHTS.windows; "All" (730) and any non-bucketed range fall back to all-time figures.
   function opsWin(days){var w=OPS_INSIGHTS.windows&&OPS_INSIGHTS.windows[String(days)];return w||{redFlags:OPS_INSIGHTS.redFlags,cycleTimes:OPS_INSIGHTS.cycleTimes};}
+  // Reporting-sheet windows (win/cancel/inspection-fail rates, by board-event date) follow the same range pills;
+  // "All" (730) / non-bucketed falls back to the all-time funnel + cancellation + inspection figures.
+  function repWin(days){var r=OPS_INSIGHTS.reporting;var w=r&&r.windows&&r.windows[String(days)];return w||{winRate:OPS_INSIGHTS.funnel.winRate,cancelRate:OPS_INSIGHTS.cancellations.ratePctOfResolved,completed:OPS_INSIGHTS.funnel.ptoReached,cancelled:OPS_INSIGHTS.funnel.cancelled,inspectionFailRate:OPS_INSIGHTS.inspections.failRatePct,inspectionEvents:OPS_INSIGHTS.inspections.events};}
   // Red-flag rows: label = display group, value = group total, tip = fine-category breakdown (hover).
   function rfChartData(cats){return (cats||[]).map(function(c){var subs=c.subcategories||[];return {label:String(c.category).replace(/_/g," "),value:c.count,tip:String(c.category)+": "+Number(c.count).toLocaleString()+" flags"+(subs.length?"\n"+subs.map(function(s){return "  • "+String(s.category).replace(/_/g," ")+": "+Number(s.count).toLocaleString();}).join("\n"):"")};});}
   var ow=opsWin(fltDays);
+  var rw=repWin(fltDays);
   var owIsAll=!(OPS_INSIGHTS.windows&&OPS_INSIGHTS.windows[String(fltDays)]);
   var owLabel=owIsAll?"all-time":"last "+((RANGE_OPTS.find(function(o){return o.d===fltDays;})||{l:fltDays+"d"}).l);
   useEffect(function(){  // hydrate the view from the URL once (shareable saved views)
@@ -1832,11 +1836,12 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
 
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:8,marginBottom:"1rem"}}>
         {[
-          {l:"Total jobs",v:OPS_INSIGHTS.funnel.totalJobs.toLocaleString(),c:th.text,s:OPS_INSIGHTS.records.toLocaleString()+" extracted"},
-          {l:"Win rate (resolved)",v:OPS_INSIGHTS.funnel.winRate+"%",c:OPS_INSIGHTS.funnel.winRate>=70?cc.green:cc.amber,s:OPS_INSIGHTS.funnel.resolved.toLocaleString()+" resolved"},
-          {l:"Cancellation rate",v:OPS_INSIGHTS.cancellations.ratePctOfResolved+"%",c:OPS_INSIGHTS.cancellations.ratePctOfResolved>30?cc.red:OPS_INSIGHTS.cancellations.ratePctOfResolved>15?cc.amber:cc.green,s:"median "+OPS_INSIGHTS.cancellations.medianDaysToCancel+"d to cancel"},
-          {l:"Inspection fail rate",v:OPS_INSIGHTS.inspections.failRatePct+"%",c:OPS_INSIGHTS.inspections.failRatePct>30?cc.red:OPS_INSIGHTS.inspections.failRatePct>15?cc.amber:cc.green,s:OPS_INSIGHTS.inspections.failures.toLocaleString()+" of "+OPS_INSIGHTS.inspections.events.toLocaleString()},
-          {l:"Clawback at risk",v:OPS_INSIGHTS.clawbackAtRisk.toLocaleString(),c:cc.red,s:"jobs flagged"},
+          {l:"Active jobs (current)",v:Number(pd.totalActiveJobs||0).toLocaleString(),c:th.text,s:"open jobs in active stages now"},
+          {l:"Win rate ("+owLabel+")",v:(rw.winRate==null?"-":rw.winRate+"%"),c:(rw.winRate>=70?cc.green:cc.amber),s:Number(rw.completed||0).toLocaleString()+" completed / "+Number(rw.cancelled||0).toLocaleString()+" cancelled"},
+          {l:"Cancellation rate ("+owLabel+")",v:(rw.cancelRate==null?"-":rw.cancelRate+"%"),c:(rw.cancelRate>30?cc.red:rw.cancelRate>15?cc.amber:cc.green),s:Number(rw.cancelled||0).toLocaleString()+" cancelled"},
+          {l:"Inspection fail ("+owLabel+")",v:(rw.inspectionFailRate==null?"-":rw.inspectionFailRate+"%"),c:(rw.inspectionFailRate>30?cc.red:rw.inspectionFailRate>15?cc.amber:cc.green),s:Number(rw.inspectionEvents||0).toLocaleString()+" inspections"},
+          {l:"Avg truck rolls / job",v:String(OPS_INSIGHTS.truckRolls.meanPerJob),c:th.text,s:Number(OPS_INSIGHTS.truckRolls.jobsWithAny||0).toLocaleString()+" jobs had 1+"},
+          {l:"Clawback at risk (active)",v:Number(OPS_INSIGHTS.reporting.clawbackActive||0).toLocaleString(),c:cc.red,s:Number(OPS_INSIGHTS.reporting.clawbackAtRiskTotal||0).toLocaleString()+" ever flagged"},
         ].map(function(card,i){return <div key={i} style={Object.assign({},glass,{padding:"0.9rem 1rem"})}>
           <p style={{margin:"0 0 5px",fontSize:11,color:th.textMuted}}>{card.l}</p>
           <p style={{margin:0,fontSize:23,fontWeight:600,color:card.c}}>{card.v}</p>
