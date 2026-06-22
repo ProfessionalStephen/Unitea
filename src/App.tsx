@@ -1840,7 +1840,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
           {l:"Win rate ("+owLabel+")",v:(rw.winRate==null?"-":rw.winRate+"%"),c:(rw.winRate>=70?cc.green:cc.amber),s:Number(rw.completed||0).toLocaleString()+" completed / "+Number(rw.cancelled||0).toLocaleString()+" cancelled"},
           {l:"Cancellation rate ("+owLabel+")",v:(rw.cancelRate==null?"-":rw.cancelRate+"%"),c:(rw.cancelRate>30?cc.red:rw.cancelRate>15?cc.amber:cc.green),s:Number(rw.cancelled||0).toLocaleString()+" cancelled"},
           {l:"Inspection fail ("+owLabel+")",v:(rw.inspectionFailRate==null?"-":rw.inspectionFailRate+"%"),c:(rw.inspectionFailRate>30?cc.red:rw.inspectionFailRate>15?cc.amber:cc.green),s:Number(rw.inspectionEvents||0).toLocaleString()+" inspections"},
-          {l:"Avg truck rolls / job",v:String(OPS_INSIGHTS.truckRolls.meanPerJob),c:th.text,s:Number(OPS_INSIGHTS.truckRolls.jobsWithAny||0).toLocaleString()+" jobs had 1+"},
+          {l:"Avg truck rolls / completed job",v:String(OPS_INSIGHTS.truckRolls.meanPerCompletedJob),c:th.text,s:Number(OPS_INSIGHTS.truckRolls.completedJobs||0).toLocaleString()+" completed jobs (PTO reached)"},
           {l:"Clawback at risk (active)",v:Number(OPS_INSIGHTS.reporting.clawbackActive||0).toLocaleString(),c:cc.red,s:Number(OPS_INSIGHTS.reporting.clawbackAtRiskTotal||0).toLocaleString()+" ever flagged"},
         ].map(function(card,i){return <div key={i} style={Object.assign({},glass,{padding:"0.9rem 1rem"})}>
           <p style={{margin:"0 0 5px",fontSize:11,color:th.textMuted}}>{card.l}</p>
