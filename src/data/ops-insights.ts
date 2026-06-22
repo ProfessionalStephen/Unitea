@@ -406,9 +406,9 @@ export const OPS_INSIGHTS = {
   },
   "clawbackAtRisk": 1159,
   "truckRolls": {
-    "meanPerJob": 0.9,
-    "jobs": 11405,
-    "jobsWithAny": 4533
+    "meanPerCompletedJob": 2,
+    "completedJobs": 4512,
+    "completedWithAny": 3548
   },
   "reporting": {
     "clawbackActive": 50,
