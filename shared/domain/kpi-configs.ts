@@ -72,12 +72,16 @@ export const KPI_INIT: KpiTag[] = [
   { id: "k62", name: "Awaiting approval",        sources: [{ board: "Permitting", scope: "stage", stage: "Permit Submitted", field: "stage.deal_count" }], fallback: "0", testResult: null },
   { id: "k63", name: "Permit submitted calls due", sources: [{ board: "Permitting", scope: "stage", stage: "Permit Submitted", field: "stage.deal_count" }], fallback: "0", testResult: null },
   { id: "k64", name: "Overdue permits",          sources: [{ board: "Permitting", scope: "board", stage: null, field: "calc.stuck_count" }], fallback: "0", testResult: null },
+  { id: "k65", name: "Permit application setbacks", sources: [
+    { board: "Permitting", scope: "stage", stage: "Revisions", field: "stage.deal_count" },
+    { board: "Permitting", scope: "stage", stage: "On Hold/ Missing Items", field: "stage.deal_count" },
+  ], fallback: "0", testResult: null },
 
   // Inspection
   { id: "k70", name: "Inspections to schedule",  sources: [{ board: "Inspection", scope: "stage", stage: "Inspection Ready to Schedule", field: "stage.deal_count" }], fallback: "0", testResult: null },
   { id: "k71", name: "Inspections scheduled",    sources: [{ board: "Inspection", scope: "stage", stage: "Inspection Scheduled", field: "stage.deal_count" }], fallback: "0", testResult: null },
   { id: "k72", name: "Affidavits needed",        sources: [{ board: "Inspection", scope: "stage", stage: "Need affidavit ", field: "stage.deal_count" }], fallback: "0", testResult: null },
-  { id: "k73", name: "Failed inspections",       sources: [{ board: "Inspection", scope: "stage", stage: "Failed Inspection", field: "stage.deal_count" }], fallback: "0", testResult: null },
+  { id: "k73", name: "Inspection Red-Tags",      sources: [{ board: "Inspection", scope: "stage", stage: "Failed Inspection", field: "stage.deal_count" }], fallback: "0", testResult: null },
   { id: "k74", name: "Passed inspections",       sources: [{ board: "Inspection", scope: "stage", stage: "Inspection Passed ", field: "stage.deal_count" }], fallback: "0", testResult: null },
   { id: "k75", name: "Pending COC",              sources: [{ board: "Inspection", scope: "stage", stage: "Pend COC", field: "stage.deal_count" }], fallback: "0", testResult: null },
 
