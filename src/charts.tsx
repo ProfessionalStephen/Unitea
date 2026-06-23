@@ -3,6 +3,7 @@
 // Kept dependency-free on purpose to match this repo's minimal-deps philosophy.
 // Shared constants/types/helpers live in ./chart-utils so this file only exports components.
 
+import { useState } from "react";
 import { CHART_COLORS, fmtNum, truncLabel } from "./chart-utils";
 import type { ChartTheme, Datum, NumFormat } from "./chart-utils";
 
@@ -58,6 +59,7 @@ export function LineChart(props: {
   goalColor?: string;
 }) {
   const { data, th, format = "int", color = CHART_COLORS[0], area = true, height = 200, goal, goalColor } = props;
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const VBW = 600, VBH = height;
   const padL = 44, padR = 12, padT = 12, padB = 26;
   const n = data.length;
@@ -95,10 +97,21 @@ export function LineChart(props: {
       {area && n > 1 && <path d={areaPath} fill={color} opacity={0.13} />}
       {n > 1 && <polyline points={pts} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" />}
       {data.map((d, i) => (
-        <circle key={"p" + i} cx={x(i)} cy={y(d.value)} r={2.5} fill={color}>
-          <title>{d.label}: {fmtNum(d.value, format)}</title>
+        <circle key={"p" + i} cx={x(i)} cy={y(d.value)} r={3.5} fill={color}
+          onMouseEnter={() => setHoverIdx(i)} onMouseLeave={() => setHoverIdx(null)} style={{ cursor: d.tip ? "help" : "default" }}>
+          <title>{d.tip || `${d.label}: ${fmtNum(d.value, format)}`}</title>
         </circle>
       ))}
+      {hoverIdx != null && data[hoverIdx] && (() => {
+        const d = data[hoverIdx];
+        const lines = String(d.tip || `${d.label}: ${fmtNum(d.value, format)}`).split("\n").slice(0, 5);
+        const bx = Math.min(Math.max(x(hoverIdx) - 88, padL), VBW - 190);
+        const by = Math.max(y(d.value) - 22 - lines.length * 15, padT + 2);
+        return <g pointerEvents="none">
+          <rect x={bx} y={by} width={184} height={lines.length * 15 + 14} rx={7} fill={th.text} opacity={0.94}/>
+          {lines.map((line, j) => <text key={j} x={bx + 9} y={by + 18 + j * 15} fontSize={10.5} fill="var(--bg-surface)">{line}</text>)}
+        </g>;
+      })()}
       {data.map((d, i) => (i % labelEvery === 0 || i === n - 1) ? (
         <text key={"x" + i} x={x(i)} y={VBH - 8} textAnchor="middle" fontSize={10} fill={th.textMuted}>
           {truncLabel(d.label, 7)}

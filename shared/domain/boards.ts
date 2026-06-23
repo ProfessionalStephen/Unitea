@@ -278,12 +278,6 @@ export const BOARDS: Record<string, BoardConfig> = {
     rotting: { "M1 Invoice needed": 1, "M2 invoice needed": 2 },
   },
 
-  "System Monitoring": {
-    region: "FL",
-    stages: ["Needs Array Built", "Array Built"],
-    rotting: {},
-  },
-
   "Warranty Board": { // [SIC] PD pipeline literally named "Warranty Board"
     region: "FL",
     stages: ["Warranty Needed", "Job Completed"],

@@ -111,12 +111,12 @@ function buildPipelineData(liveApiData) {
     boards[bName]={name:bName,region:cfg.region,jobCount:boardTotalJobs,avgDays:boardAvgDays,stuckCount:boardStuck,totalValue:boardTotalValue,status:status,stages:stages,live:!!(liveApiData&&liveApiData.boardData&&liveApiData.boardData[bName])};
   });
 
-  // End-to-end: sum of current active stage averages (terminal stages excluded above).
-  var endToEndDays=Object.values(boards).reduce(function(sum,b){
-    return sum+Object.values(b.stages).reduce(function(stageSum,s){
-      return stageSum+(!isTerminalStage(b.name,s.name)&&s.jobCount>0?Number(s.avgDays||0):0);
-    },0);
-  },0);
+  // Current pipeline speed: average active deal age, weighted by actual deals. Summing stage averages
+  // across every board made the headline look thousands of days long when many stages had data.
+  var activeTotalDays=activeDeals.reduce(function(sum,d){return sum+Number(d.days||0);},0);
+  var activeThresholdTotal=activeDeals.reduce(function(sum,d){var cfg=BOARDS[d.board];var threshold=cfg&&cfg.rotting?cfg.rotting[d.stage]:0;return sum+(threshold?Number(threshold):0);},0);
+  var endToEndDays=activeDeals.length>0?activeTotalDays/activeDeals.length:0;
+  var goalBenchDays=activeDeals.length>0?activeThresholdTotal/activeDeals.length:GOAL_BENCHMARK_DAYS;
 
   // Bottleneck detection: current active stages where avgDays exceeds the configured rotting goal.
   var bottlenecks=[];
@@ -158,7 +158,7 @@ function buildPipelineData(liveApiData) {
     totalActiveJobs:totalActiveJobs,
     totalStuck:totalStuck,
     endToEndDays:parseFloat(endToEndDays.toFixed(1)),
-    goalBenchDays:GOAL_BENCHMARK_DAYS,
+    goalBenchDays:parseFloat(goalBenchDays.toFixed(1)),
     bottlenecks:bottlenecks,
     repStats:repStats,
     allDeals:allDeals,
@@ -451,6 +451,27 @@ function SubTab({tabs,active,onChange,th}){return <div style={{display:"flex",ga
 function SDot({on}){return <span style={{display:"inline-block",width:8,height:8,borderRadius:"50%",background:on?C.green:C.orange,boxShadow:on?"0 0 6px "+C.green:"0 0 6px "+C.orange,marginRight:6}}/>;}
 function RBadge({role}){var t=RT[role];var fg=t?t.color:"#897C80";return <span style={{background:fg+"18",color:fg,border:"1px solid "+fg+"44",fontSize:11,fontWeight:500,padding:"2px 8px",borderRadius:20,whiteSpace:"nowrap"}}>{role}</span>;}
 
+function DatasetReportControl({label,kpi,dataPoint,context,th,onReportIssue}){
+  var [open,setOpen]=useState(false);
+  var [bugType,setBugType]=useState(BUG_TYPES[0]);
+  var [note,setNote]=useState("");
+  var [sent,setSent]=useState(false);
+  if(!onReportIssue)return null;
+  return <div style={{position:"relative",display:"inline-flex",alignItems:"center",zIndex:20}}>
+    <button onClick={function(e){e.stopPropagation();setOpen(!open);setSent(false);}} style={{display:"inline-flex",alignItems:"center",gap:5,background:open?C.red+"18":th.inputBg,border:"1px solid "+(open?C.red+"55":th.borderPlain),borderRadius:20,padding:"5px 10px",color:open?C.red:th.textMuted,fontSize:10.5,cursor:"pointer",whiteSpace:"nowrap"}}><i className="ti ti-flag" style={{fontSize:12}} aria-hidden="true"/>Report issue</button>
+    {open&&<div onClick={function(e){e.stopPropagation();}} style={{position:"absolute",right:0,top:"calc(100% + 6px)",width:290,background:th.cardSolid,border:"1px solid "+C.red+"44",borderRadius:12,padding:"10px 12px",boxShadow:"0 14px 34px rgba(0,0,0,0.35)",textAlign:"left"}}>
+      <p style={{margin:"0 0 3px",fontSize:12,fontWeight:500,color:C.red}}>Report dataset issue</p>
+      <p style={{margin:"0 0 8px",fontSize:11,color:th.textMuted,lineHeight:1.4}}>{label}</p>
+      <select value={bugType} onChange={function(e){setBugType(e.target.value);}} style={{width:"100%",background:th.selectBg,border:"1px solid "+th.inputBorder,borderRadius:8,color:th.selectText,fontSize:11,padding:"6px 8px",marginBottom:7}}>{BUG_TYPES.map(function(t){return <option key={t} style={{background:th.selectBg,color:th.selectText}}>{t}</option>;})}</select>
+      <textarea value={note} onChange={function(e){setNote(e.target.value);}} placeholder="What looks wrong or unclear?" rows={2} style={{width:"100%",resize:"vertical",boxSizing:"border-box",background:th.inputBg,border:"1px solid "+th.inputBorder,borderRadius:8,color:th.text,fontSize:11,padding:"7px 8px",fontFamily:"inherit",marginBottom:8}}/>
+      <div style={{display:"flex",alignItems:"center",gap:8}}>
+        <button onClick={function(){if(!note.trim())return;onReportIssue({kpi:kpi||"General / Other",bugType:bugType,dataPoint:dataPoint||label,issue:note.trim(),context:context||label});setNote("");setSent(true);}} style={{background:"linear-gradient(135deg,"+C.orange+","+C.orangeDeep+")",border:"none",borderRadius:8,color:"#fff",fontWeight:500,fontSize:11,padding:"6px 10px",cursor:note.trim()?"pointer":"not-allowed",opacity:note.trim()?1:0.55}}>Send to RALPH</button>
+        {sent&&<span style={{fontSize:11,color:C.green}}>Sent.</span>}
+      </div>
+    </div>}
+  </div>;
+}
+
 // Compact pill version of the cron status — sits in the header
 function CronStatusPill({status}){
   if(status.loading)return <div style={{display:"flex",alignItems:"center",gap:5,background:"#6B626622",border:"1px solid #6B626644",borderRadius:20,padding:"5px 12px"}}><span style={{color:"#897C80",fontSize:10}}>●</span><span style={{fontSize:11,color:"#897C80"}}>Checking...</span></div>;
@@ -661,19 +682,24 @@ function KpiDrillDown({kpiName,pd,memberBoards,role,onClose,th,onNavigateIntelli
 // 4 sub-tabs: Overview, Heat Map, Bottlenecks, History
 // All powered by pipelineData
 // ─────────────────────────────────────────────
-function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summaryLoading,activeSubTab,onSubTabChange}){
+function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summaryLoading,activeSubTab,onSubTabChange,region,onReportIssue}){
   var [internalSub,setInternalSub]=useState("Overview");
   var sub=activeSubTab||internalSub;
   var setSub=onSubTabChange||setInternalSub;
   var [range,setRange]=useState("Week over week");
   var [heatExpand,setHeatExpand]=useState(null);
-  var memberBoards=(member.boards||[]).filter(function(b){return pd.boards[b];});
+  function regionAllows(bName){return !region||region==="All"||(BOARDS[bName]&&BOARDS[bName].region===region);}
+  var memberBoards=(member.boards||[]).filter(function(b){return pd.boards[b]&&regionAllows(b);});
   var showRepData=canAccess(role,"repData");
   var goalBenchDays=pd.goalBenchDays||GOAL_BENCHMARK_DAYS;
   function heatmapStagesFor(bName){var b=pd.boards[bName];return b?Object.values(b.stages).filter(function(s){return s.jobCount>0&&!isTerminalStage(bName,s.name);}):[];}
-  var speedBoards=(memberBoards.length?memberBoards:Object.keys(pd.boards||{})).filter(function(bName){return heatmapStagesFor(bName).length>0;});
-  var speedEndToEndDays=parseFloat(speedBoards.reduce(function(sum,bName){return sum+heatmapStagesFor(bName).reduce(function(stageSum,s){return stageSum+Number(s.avgDays||0);},0);},0).toFixed(1));
-  var speedBenchmarkDays=speedBoards.reduce(function(sum,bName){return sum+heatmapStagesFor(bName).reduce(function(stageSum,s){return stageSum+(s.threshold?Number(s.threshold):0);},0);},0);
+  var speedBoards=(memberBoards.length?memberBoards:Object.keys(pd.boards||{}).filter(regionAllows)).filter(function(bName){return heatmapStagesFor(bName).length>0;});
+  var speedJobCount=speedBoards.reduce(function(sum,bName){return sum+heatmapStagesFor(bName).reduce(function(stageSum,s){return stageSum+Number(s.jobCount||0);},0);},0);
+  var speedTotalDays=speedBoards.reduce(function(sum,bName){return sum+heatmapStagesFor(bName).reduce(function(stageSum,s){return stageSum+(Number(s.avgDays||0)*Number(s.jobCount||0));},0);},0);
+  var speedTotalGoalDays=speedBoards.reduce(function(sum,bName){return sum+heatmapStagesFor(bName).reduce(function(stageSum,s){return stageSum+((s.threshold?Number(s.threshold):0)*Number(s.jobCount||0));},0);},0);
+  var speedEndToEndDays=speedJobCount>0?parseFloat((speedTotalDays/speedJobCount).toFixed(1)):0;
+  var speedBenchmarkDays=speedJobCount>0?parseFloat((speedTotalGoalDays/speedJobCount).toFixed(1)):goalBenchDays;
+  var intelBottlenecks=(pd.bottlenecks||[]).filter(function(b){return regionAllows(b.board);});
 
   // Snapshot accumulation state — fetched lazily when History sub-tab opens
   var [snapInfo,setSnapInfo]=useState({loading:false,loaded:false,count:0,oldest:null,newest:null,error:null});
@@ -741,7 +767,7 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
         {[
           {l:"Active jobs",v:pd.totalActiveJobs,col:C.orange,tip:"Open deals still in an active stage. Completed/terminal stages (PTO reached, milestone invoiced, cancellation processed, serviced) are excluded. Pulled live when you click 'Pull live data'."},
           {l:"Stuck jobs",v:pd.totalStuck,col:C.red,tip:"Current active deals past the configured rotting goal for their stage. Completed/terminal stages are excluded."},
-          {l:"End-to-end avg",v:pd.endToEndDays+"d",col:C.blue,tip:"Sum of current active average days-in-stage across non-terminal stages. Completed/terminal stages are excluded."},
+          {l:"Avg active age",v:pd.endToEndDays+"d",col:C.blue,tip:"Weighted average age of current active deals. Completed/terminal stages are excluded."},
           {l:"Goal bench",v:goalBenchDays+"d",col:th.textMuted,tip:"Sum of configured rotting goals for non-terminal pipeline stages. This replaces the generic industry benchmark as the target to beat."}
         ].map(function(s){
           return <div key={s.l} title={s.tip} style={{background:s.col+"0d",border:"1px solid "+s.col+"22",borderRadius:10,padding:"10px 12px",textAlign:"center",cursor:"help"}}>
@@ -763,6 +789,10 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
         })}
       </div>
 
+      <div style={{display:"flex",alignItems:"center",gap:8,margin:"0 0 8px",flexWrap:"wrap"}}>
+        <p style={{margin:0,fontSize:12,fontWeight:500,color:th.text,flex:1}}>Board health by assigned board</p>
+        <DatasetReportControl label="Intelligence overview board health" kpi="Intelligence" dataPoint="Overview / board health" context={(region||"All")+" Intelligence overview"} th={th} onReportIssue={onReportIssue}/>
+      </div>
       <div style={{display:"flex",flexDirection:"column",gap:6}}>
         {memberBoards.map(function(bName){
           var b=pd.boards[bName];if(!b)return null;
@@ -782,9 +812,10 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
     {sub==="Heat Map"&&<div>
       <div style={{display:"flex",gap:8,marginBottom:"1rem",alignItems:"center",flexWrap:"wrap"}}>
         <div style={{flex:1}}>
-          <p style={{margin:0,fontSize:13,fontWeight:500,color:th.text}}>End-to-end avg: <span style={{color:C.orange}}>{speedEndToEndDays} days</span> &nbsp; Industry benchmark: <span style={{color:th.textMuted}}>{speedBenchmarkDays} days</span></p>
-          <p style={{margin:"3px 0 0",fontSize:11,color:speedEndToEndDays>speedBenchmarkDays?C.red:C.green}}>{speedEndToEndDays>speedBenchmarkDays?"Above industry benchmark by "+(speedEndToEndDays-speedBenchmarkDays).toFixed(1)+"d":"Within industry benchmark"}</p>
+          <p style={{margin:0,fontSize:13,fontWeight:500,color:th.text}}>Avg active age: <span style={{color:C.orange}}>{speedEndToEndDays} days</span> &nbsp; Goal bench: <span style={{color:th.textMuted}}>{speedBenchmarkDays} days</span></p>
+          <p style={{margin:"3px 0 0",fontSize:11,color:speedEndToEndDays>speedBenchmarkDays?C.red:C.green}}>{speedEndToEndDays>speedBenchmarkDays?"Above goal bench by "+(speedEndToEndDays-speedBenchmarkDays).toFixed(1)+"d":"Within goal bench"}</p>
         </div>
+        <DatasetReportControl label="Intelligence heat map" kpi="Intelligence" dataPoint="Heat Map / average active age" context={(region||"All")+" heat map"} th={th} onReportIssue={onReportIssue}/>
       </div>
 
       <div style={{margin:"0 0 12px",padding:"10px 12px",background:th.inputBg,border:"1px solid "+th.borderPlain,borderRadius:10}}>
@@ -832,10 +863,13 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
         {!aiSummary&&!summaryLoading&&<p style={{margin:0,fontSize:12,color:th.textMuted}}>Click Refresh to generate an AI analysis of your current bottlenecks and patterns.</p>}
       </div>
 
-      <p style={{margin:"0 0 8px",fontSize:12,fontWeight:500,color:th.text}}>Top bottlenecks ({pd.bottlenecks.length} detected)</p>
-      <p style={{margin:"0 0 12px",fontSize:11,color:th.textMuted}}>Current active stages where average days exceeds the configured rotting goal. Completed/terminal stages are excluded.</p>
+        <div style={{display:"flex",alignItems:"center",gap:8,margin:"0 0 8px",flexWrap:"wrap"}}>
+          <p style={{margin:0,fontSize:12,fontWeight:500,color:th.text,flex:1}}>Top bottlenecks ({intelBottlenecks.length} detected)</p>
+          <DatasetReportControl label="Intelligence bottlenecks" kpi="Intelligence" dataPoint="Bottlenecks / top active stages" context={(region||"All")+" bottlenecks"} th={th} onReportIssue={onReportIssue}/>
+        </div>
+        <p style={{margin:"0 0 12px",fontSize:11,color:th.textMuted}}>Current active stages where average days exceeds the configured rotting goal. Completed/terminal stages are excluded.</p>
       <div style={{display:"flex",flexDirection:"column",gap:5,marginBottom:"1.5rem"}}>
-        {pd.bottlenecks.slice(0,10).map(function(bn,i){
+        {intelBottlenecks.slice(0,10).map(function(bn,i){
           var severity=bn.pctAbove>=80?C.red:bn.pctAbove>=50?C.amber:C.orange;
           return <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 12px",background:th.inputBg,border:"1px solid "+severity+"33",borderRadius:9}}>
             <div style={{width:7,height:7,borderRadius:"50%",background:severity,boxShadow:"0 0 5px "+severity,flexShrink:0}}/>
@@ -850,7 +884,7 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
             <span style={{fontSize:11,color:C.red,background:C.red+"18",padding:"2px 7px",borderRadius:8,fontWeight:500}}>{bn.stuckCount} deals</span>
           </div>;
         })}
-        {pd.bottlenecks.length===0&&<p style={{margin:0,fontSize:13,color:C.green}}>✓ No significant bottlenecks detected. Current active stages are within configured rotting goals.</p>}
+        {intelBottlenecks.length===0&&<p style={{margin:0,fontSize:13,color:C.green}}>No significant bottlenecks detected. Current active stages are within configured rotting goals.</p>}
       </div>
 
       {showRepData&&<div>
@@ -889,13 +923,16 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
             <p style={{margin:"12px 0 0",fontSize:11,color:th.textMuted}}>Current snapshot: {pd.totalActiveJobs} active jobs &middot; {pd.totalStuck} stuck &middot; end-to-end {pd.endToEndDays}d</p>
           </div>
         :<div>
-          <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:8,marginBottom:14}}>
+          <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:8,marginBottom:14,alignItems:"flex-start"}}>
             <div>
               <p style={{margin:0,fontSize:13,fontWeight:500,color:th.text}}>{range}</p>
               {compareInfo.currentDate&&compareInfo.baselineDate&&
                 <p style={{margin:"2px 0 0",fontSize:11,color:th.textMuted}}>{dmy(compareInfo.baselineDate)}→ {dmy(compareInfo.currentDate)}</p>}
             </div>
-            <p style={{margin:0,fontSize:11,color:th.textMuted}}>{snapInfo.count} snapshot{snapInfo.count===1?"":"s"} stored &middot; oldest {dmy(snapInfo.oldest)}</p>
+            <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",justifyContent:"flex-end"}}>
+              <p style={{margin:0,fontSize:11,color:th.textMuted}}>{snapInfo.count} snapshot{snapInfo.count===1?"":"s"} stored &middot; oldest {dmy(snapInfo.oldest)}</p>
+              <DatasetReportControl label="Intelligence snapshot history" kpi="Intelligence" dataPoint="History / period comparison" context={(region||"All")+" snapshot history"} th={th} onReportIssue={onReportIssue}/>
+            </div>
           </div>
           {compareInfo.loading?
             <p style={{margin:0,fontSize:12,color:th.textMuted,textAlign:"center",padding:"1rem 0"}}>Computing diff…</p>
@@ -1119,6 +1156,8 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
   var th=TH;
   var cc=chartColors(dark);   // theme-aware, gate-verified chart/RAG palette
   var glass={background:th.card,border:"1px solid "+th.border,borderRadius:16,padding:"1.25rem"};
+  var titleType={fontFamily:"Georgia, 'Times New Roman', serif",letterSpacing:"-0.01em"};
+  var descType={fontFamily:"'Segoe UI', system-ui, sans-serif",lineHeight:1.45};
   var iS={background:th.inputBg,border:"1px solid "+th.inputBorder,borderRadius:10,color:th.selectText,fontSize:13,padding:"8px 11px",outline:"none",fontFamily:"inherit",boxSizing:"border-box" as const};
 
   // Derive admin status from session email (case-insensitive match)
@@ -1209,7 +1248,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
 
   // PR-A: reporting controls (date-range + region) + URL-encoded saved views + live-KPI trend series
   var [fltDays,setFltDays]=useState(90);
-  var [fltRegion,setFltRegion]=useState("All");
+  var [fltRegion,setFltRegion]=useState("FL");
   var [trendMetric,setTrendMetric]=useState("totalActiveJobs");
   var [seriesInfo,setSeriesInfo]=useState({loading:false,status:null,series:null,error:null});
   var [copied,setCopied]=useState(false);
@@ -1224,10 +1263,20 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
   function setbackLabel(category){var c=String(category);if(c==="inspection_failure")return "Inspection Red-Tags";if(c==="documentation_blocker"||c==="permitting_compliance")return "Permitting application setbacks";return c.replace(/_/g," ");}
   // Setback rows: label = display group, value = group total, tip = fine-category breakdown (hover).
   function rfChartData(cats){return (cats||[]).map(function(c){var subs=c.subcategories||[];return {label:setbackLabel(c.category),value:c.count,tip:setbackLabel(c.category)+": "+Number(c.count).toLocaleString()+" setbacks"+(subs.length?"\n"+subs.map(function(s){return "  • "+setbackLabel(s.category)+": "+Number(s.count).toLocaleString();}).join("\n"):"")};});}
+  function boardInRegion(bName){return fltRegion==="All"||(BOARDS[bName]&&BOARDS[bName].region===fltRegion);}
+  function regionName(){return fltRegion==="FL"?"Florida":fltRegion==="CA"?"California":"All regions";}
   var ow=opsWin(fltDays);
   var rw=repWin(fltDays);
   var owIsAll=!(OPS_INSIGHTS.windows&&OPS_INSIGHTS.windows[String(fltDays)]);
   var owLabel=owIsAll?"all-time":"last "+((RANGE_OPTS.find(function(o){return o.d===fltDays;})||{l:fltDays+"d"}).l);
+  var cancellationMonths=OPS_INSIGHTS.cancellations.monthly.slice(-(owIsAll?OPS_INSIGHTS.cancellations.monthly.length:Math.max(1,Math.ceil(fltDays/30))));
+  var cancellationMonthTotal=cancellationMonths.reduce(function(sum,m){return sum+Number(m.count||0);},0)||1;
+  var rangeOutcomeData=owIsAll
+    ?OPS_INSIGHTS.funnel.outcomes
+    :[{label:"Completed",count:Number(rw.completed||0)},{label:"Cancelled",count:Number(rw.cancelled||0)}];
+  var cancellationWhereRows=OPS_INSIGHTS.cancellations.where.filter(function(w){return fltRegion==="All"||boardInRegion(w.board);});
+  var cancellationWhereTotal=cancellationWhereRows.reduce(function(sum,w){return sum+Number(w.cancels||0);},0)||1;
+  var cancellationWhereData=cancellationWhereRows.map(function(w){return {label:w.board,value:Number(w.cancels||0)/cancellationWhereTotal*100,tip:w.board+": "+Number(w.cancels||0).toLocaleString()+" cancellations\n"+(Number(w.cancels||0)/cancellationWhereTotal*100).toFixed(1)+"% of "+regionName()+" cancellations"};});
   useEffect(function(){  // hydrate the view from the URL once (shareable saved views)
     try{var q=new URLSearchParams(window.location.search);
       if(q.get("tab"))setTab(q.get("tab"));
@@ -1244,18 +1293,22 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
   useEffect(function(){  // date-rangeable live-KPI trend, fetched on Overview + when the range changes
     if(tab!=="Overview")return;
     setSeriesInfo(function(s){return Object.assign({},s,{loading:true,error:null});});
-    fetch("/api/snapshots/series?days="+fltDays,{credentials:"include"})
+    fetch("/api/snapshots/series?days="+fltDays+"&region="+encodeURIComponent(fltRegion),{credentials:"include"})
       .then(function(r){return r.ok?r.json():Promise.reject(new Error("HTTP "+r.status));})
       .then(function(j){setSeriesInfo({loading:false,status:j.status||null,series:j.series||null,error:null});})
       .catch(function(e){setSeriesInfo({loading:false,status:"error",series:null,error:e.message||"series failed"});});
-  },[tab,fltDays]);
+  },[tab,fltDays,fltRegion]);
   function copyLink(){try{navigator.clipboard.writeText(window.location.href);setCopied(true);setTimeout(function(){setCopied(false);},1500);}catch(e){}}
   function dmShort(ymd){return String(ymd).slice(8,10)+"/"+String(ymd).slice(5,7);}
 
   // Single derived pipelineData — everything in the app reads from this
   var pd=useMemo(function(){return buildPipelineData(liveApiData);},[liveApiData]);
+  var regionBoardNames=Object.keys(pd.boards).filter(function(b){return boardInRegion(b);});
+  var regionActiveJobs=regionBoardNames.reduce(function(sum,b){return sum+Number(pd.boards[b].jobCount||0);},0);
+  var regionStuck=regionBoardNames.reduce(function(sum,b){return sum+Number(pd.boards[b].stuckCount||0);},0);
 
   var allBoards=Object.keys(BOARDS);
+  var boardHealthNames=allBoards.filter(function(b){return boardInRegion(b);});
   var draftChanges=audit.filter(function(e){return e.draft;});
 
   function addAudit(action,detail,type){type=type||"system";setAudit(function(l){return [{id:Date.now(),ts:dmyTime(),user:"Stephen Farrell",action:action,detail:detail,type:type,draft:draft}].concat(l);});}
@@ -1661,29 +1714,29 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
         <div style={{display:"flex",gap:4,background:th.tabBg,border:"1px solid "+th.borderPlain,borderRadius:10,padding:3}}>
           {RANGE_OPTS.map(function(o){var a=fltDays===o.d;return <button key={o.d} onClick={function(){setFltDays(o.d);}} style={{fontSize:11,padding:"6px 11px",borderRadius:8,border:"none",cursor:"pointer",background:a?C.orange+"22":"transparent",color:a?C.orange:th.textMuted,fontWeight:a?500:400}}>{o.l}</button>;})}
         </div>
-        <span style={{fontSize:11,color:th.textMuted,marginLeft:6}}>Region</span>
+        <span style={{fontSize:11,color:th.textMuted}}>Region</span>
         <select value={fltRegion} onChange={function(e){setFltRegion(e.target.value);}} style={Object.assign({},iS,{padding:"6px 9px"})}>
-          <option value="All">All regions</option><option value="FL">Florida</option><option value="CA">California</option>
+          <option value="FL">Florida (HQ)</option><option value="All">All regions</option><option value="CA">California</option>
         </select>
         <button onClick={copyLink} title="Copy a shareable link to this view" style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:5,background:th.inputBg,border:"1px solid "+th.borderPlain,borderRadius:20,padding:"6px 12px",color:copied?cc.green:th.textMuted,fontSize:11,cursor:"pointer"}}><i className={"ti "+(copied?"ti-check":"ti-link")} style={{fontSize:13}} aria-hidden="true"/>{copied?"Copied":"Copy link"}</button>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:12,marginBottom:14}}>
         {[
-          {l:"Active jobs",v:String(pd.totalActiveJobs),c:th.text,s:pd.totalStuck+" stuck"},
-          {l:"Win rate",v:OPS_INSIGHTS.funnel.winRate+"%",c:OPS_INSIGHTS.funnel.winRate>=70?cc.green:cc.amber,s:OPS_INSIGHTS.funnel.resolved.toLocaleString()+" resolved"},
-          {l:"Cancellation rate",v:OPS_INSIGHTS.cancellations.ratePctOfResolved+"%",c:OPS_INSIGHTS.cancellations.ratePctOfResolved>30?cc.red:OPS_INSIGHTS.cancellations.ratePctOfResolved>15?cc.amber:cc.green,s:"median "+OPS_INSIGHTS.cancellations.medianDaysToCancel+"d to cancel"},
+          {l:"Active jobs",v:String(regionActiveJobs),c:th.text,s:regionStuck+" stuck · "+regionName()},
+          {l:"Win rate",v:(rw.winRate==null?"-":rw.winRate+"%"),c:(rw.winRate>=70?cc.green:cc.amber),s:Number(rw.completed||0).toLocaleString()+" completed · "+owLabel},
+          {l:"Cancellation rate",v:(rw.cancelRate==null?"-":rw.cancelRate+"%"),c:(rw.cancelRate>30?cc.red:rw.cancelRate>15?cc.amber:cc.green),s:Number(rw.cancelled||0).toLocaleString()+" cancelled · "+owLabel},
           {l:"Median cycle → PTO",v:(ow.cycleTimes[0].median!=null?ow.cycleTimes[0].median+"d":"—"),c:th.text,s:"contract → PTO · "+owLabel},
-          {l:"Inspection Red-Tag rate",v:OPS_INSIGHTS.inspections.failRatePct+"%",c:OPS_INSIGHTS.inspections.failRatePct>30?cc.red:OPS_INSIGHTS.inspections.failRatePct>15?cc.amber:cc.green,s:OPS_INSIGHTS.inspections.failures.toLocaleString()+" inspection Red-Tags"}
+          {l:"Inspection Red-Tag rate",v:(rw.inspectionFailRate==null?"-":rw.inspectionFailRate+"%"),c:(rw.inspectionFailRate>30?cc.red:rw.inspectionFailRate>15?cc.amber:cc.green),s:Number(rw.inspectionEvents||0).toLocaleString()+" inspections · "+owLabel}
         ].map(function(card,i){return <div key={i} onClick={function(){setDrillBoards(null);setKpiDrillKpi(card.l+" — "+card.v);}} title="Click to drill into the underlying jobs" style={Object.assign({},glass,{padding:"0.9rem 1.1rem",cursor:"pointer"})}>
-          <p style={{margin:"0 0 5px",fontSize:11,color:th.textMuted}}>{card.l}</p>
+          <p style={Object.assign({},titleType,{margin:"0 0 5px",fontSize:12,color:th.textMuted})}>{card.l}</p>
           <p style={{margin:0,fontSize:25,fontWeight:600,color:card.c}}>{card.v}</p>
-          <p style={{margin:"3px 0 0",fontSize:10.5,color:th.textMuted}}>{card.s}</p>
+          <p style={Object.assign({},descType,{margin:"3px 0 0",fontSize:10.5,color:th.textMuted})}>{card.s}</p>
         </div>;})}
       </div>
       {/* Date-rangeable live-KPI trend (PR-A) */}
       <div style={Object.assign({},glass,{marginBottom:12})}>
         <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:10}}>
-          <span style={{fontSize:14,fontWeight:500,color:th.text,flex:1}}>KPI trend</span>
+          <span style={Object.assign({},titleType,{fontSize:15,fontWeight:600,color:th.text,flex:1})}>KPI trend</span>
           <select value={trendMetric} onChange={function(e){setTrendMetric(e.target.value);}} style={Object.assign({},iS,{padding:"5px 9px"})}>
             {Object.keys(METRIC_LABELS).map(function(k){return <option key={k} value={k}>{METRIC_LABELS[k]}</option>;})}
           </select>
@@ -1696,26 +1749,26 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
       </div>
       <div style={{display:"grid",gridTemplateColumns:"minmax(280px,360px) 1fr",gap:12,marginBottom:12}}>
         <div style={glass}>
-          <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Job outcomes</p>
-          <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>All jobs by lifecycle phase</p>
-          <DonutChart th={th} data={OPS_INSIGHTS.funnel.outcomes.map(function(o,i){return {label:o.label,value:o.count,color:[cc.blue,cc.green,cc.teal,cc.red,cc.amber,cc.neutral][i]};})}/>
+          <p style={Object.assign({},titleType,{margin:"0 0 2px",fontSize:15,fontWeight:600,color:th.text})}>Job outcomes</p>
+          <p style={Object.assign({},descType,{margin:"0 0 10px",fontSize:11,color:th.textMuted})}>{owIsAll?"All jobs by lifecycle phase":"Resolved jobs in "+owLabel}</p>
+          <DonutChart th={th} data={rangeOutcomeData.map(function(o,i){return {label:o.label,value:o.count,color:[cc.blue,cc.green,cc.teal,cc.red,cc.amber,cc.neutral][i]};})}/>
         </div>
         <div style={glass}>
-          <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Cancellations per month</p>
-          <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Trend &middot; dashed = target</p>
-          <LineChart th={th} color={cc.orange} goal={CANCELLATIONS_PER_MONTH_TARGET} goalColor={cc.amber} data={OPS_INSIGHTS.cancellations.monthly.slice(-Math.max(3,Math.ceil(fltDays/30))).map(function(m){return {label:monthYear(m.month,true),value:m.count};})}/>
+          <p style={Object.assign({},titleType,{margin:"0 0 2px",fontSize:15,fontWeight:600,color:th.text})}>Cancellations per month</p>
+          <p style={Object.assign({},descType,{margin:"0 0 10px",fontSize:11,color:th.textMuted})}>Hover a point for count and share of selected range. Reason detail is not in the monthly export yet.</p>
+          <LineChart th={th} color={cc.orange} goal={CANCELLATIONS_PER_MONTH_TARGET} goalColor={cc.amber} data={cancellationMonths.map(function(m){var pct=(Number(m.count||0)/cancellationMonthTotal*100);return {label:monthYear(m.month,true),value:m.count,tip:monthYear(m.month)+"\nCount: "+Number(m.count||0).toLocaleString()+" cancellations\nShare: "+pct.toFixed(1)+"% of selected range\nReasons: not exported monthly yet"};})}/>
         </div>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
         <div style={glass}>
-          <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Top setback categories</p>
-          <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Inspection Red-Tags are code failures issued by a municipality during inspections. Permit declines, missing documents, and application corrections are permitting setbacks. {ow.redFlags.total.toLocaleString()} setbacks &middot; {owLabel}</p>
+          <p style={Object.assign({},titleType,{margin:"0 0 2px",fontSize:15,fontWeight:600,color:th.text})}>Operational blockers</p>
+          <p style={Object.assign({},descType,{margin:"0 0 10px",fontSize:11,color:th.textMuted})}>Inspection Red-Tags are code failures issued by a municipality during inspections. Permit declines, missing documents, and application corrections are permitting setbacks. {ow.redFlags.total.toLocaleString()} blockers &middot; {owLabel}</p>
           <BarChart th={th} color={cc.red} data={rfChartData(ow.redFlags.categories.slice(0,6))}/>
         </div>
         <div style={glass}>
-          <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Active pipeline by board {pd.isLive?"":"(simulated)"}</p>
-          <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Live &middot; {pd.totalActiveJobs} active jobs</p>
-          <BarChart th={th} color={cc.orange} onBarClick={function(b){setDrillBoards([b]);setKpiDrillKpi(b+" — jobs");}} data={Object.keys(pd.boards).map(function(b){return {label:b,value:pd.boards[b].jobCount};}).filter(function(d){return d.value>0&&(fltRegion==="All"||(BOARDS[d.label]&&BOARDS[d.label].region===fltRegion));}).sort(function(a,b){return b.value-a.value;}).slice(0,8)}/>
+          <p style={Object.assign({},titleType,{margin:"0 0 2px",fontSize:15,fontWeight:600,color:th.text})}>Active pipeline by board {pd.isLive?"":"(simulated)"}</p>
+          <p style={Object.assign({},descType,{margin:"0 0 10px",fontSize:11,color:th.textMuted})}>{regionName()} &middot; {regionActiveJobs} active jobs</p>
+          <BarChart th={th} color={cc.orange} onBarClick={function(b){setDrillBoards([b]);setKpiDrillKpi(b+" — jobs");}} data={regionBoardNames.map(function(b){return {label:b,value:pd.boards[b].jobCount};}).filter(function(d){return d.value>0;}).sort(function(a,b){return b.value-a.value;}).slice(0,8)}/>
         </div>
       </div>
     </div>}
@@ -1829,19 +1882,31 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
 
     {/* BOARDS */}
     {tab==="Boards"&&<div>
-      <p style={{fontSize:13,color:th.textMuted,margin:"0 0 1rem"}}>{allBoards.length} boards - {Object.values(BOARDS).filter(function(b){return b.region==="FL";}).length} Florida - {Object.values(BOARDS).filter(function(b){return b.region==="CA";}).length} California</p>
+      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",marginBottom:"1rem"}}>
+        <p style={{fontSize:13,color:th.textMuted,margin:0,flex:1}}>{boardHealthNames.length}/{allBoards.length} boards shown - {Object.values(BOARDS).filter(function(b){return b.region==="FL";}).length} Florida - {Object.values(BOARDS).filter(function(b){return b.region==="CA";}).length} California</p>
+        <span style={{fontSize:11,color:th.textMuted}}>Region</span>
+        <select value={fltRegion} onChange={function(e){setFltRegion(e.target.value);}} style={Object.assign({},iS,{padding:"6px 9px"})}>
+          <option value="FL">Florida (HQ)</option><option value="All">All regions</option><option value="CA">California</option>
+        </select>
+      </div>
       <div style={Object.assign({},glass,{marginBottom:12})}>
-        <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Jobs by board {pd.isLive?"":"(simulated)"}</p>
-        <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Open deals per board &middot; live pipeline</p>
-        <BarChart th={th} color={cc.blue} onBarClick={function(b){setDrillBoards([b]);setKpiDrillKpi(b+" — jobs");}} data={Object.keys(pd.boards).map(function(b){return {label:b,value:pd.boards[b].jobCount};}).filter(function(d){return d.value>0;}).sort(function(a,b){return b.value-a.value;})}/>
+        <div style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+          <div style={{flex:1,minWidth:190}}>
+            <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Jobs by board {pd.isLive?"":"(simulated)"}</p>
+            <p style={{margin:0,fontSize:11,color:th.textMuted}}>Open deals per board &middot; live pipeline &middot; {regionName()}</p>
+          </div>
+          <DatasetReportControl label="Board Health jobs by board" kpi="Board Health" dataPoint="Jobs by board chart" context={regionName()+" board health chart"} th={th} onReportIssue={addRalphIssue}/>
+        </div>
+        <BarChart th={th} color={cc.blue} onBarClick={function(b){setDrillBoards([b]);setKpiDrillKpi(b+" — jobs");}} data={regionBoardNames.map(function(b){return {label:b,value:pd.boards[b].jobCount};}).filter(function(d){return d.value>0;}).sort(function(a,b){return b.value-a.value;})}/>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:8}}>
-        {allBoards.map(function(b){
+        {boardHealthNames.map(function(b){
           var bd=BOARDS[b];var rc=bd.region==="FL"?C.blue:C.green;
           var pdBoard=pd.boards[b];
           return <div key={b} style={glass}>
             <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:5}}>
               <span style={{flex:1,fontSize:13,fontWeight:500,color:th.text}}>{b}</span>
+              <DatasetReportControl label={"Board Health / "+b} kpi="Board Health" dataPoint={b+" board card"} context={b+" board health card"} th={th} onReportIssue={addRalphIssue}/>
               <span style={{fontSize:11,color:rc,background:rc+"18",padding:"1px 7px",borderRadius:10,border:"1px solid "+rc+"33"}}>{bd.region}</span>
               {pdBoard&&<div style={{width:7,height:7,borderRadius:"50%",background:pdBoard.status==="green"?C.green:pdBoard.status==="amber"?C.amber:C.red}}/>}
             </div>
@@ -1856,13 +1921,17 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
     {tab==="Intelligence"&&<div>
       <div style={{display:"flex",gap:6,marginBottom:"1rem",flexWrap:"wrap",alignItems:"center"}}>
         <p style={{margin:0,fontSize:13,color:th.textMuted,flex:1}}>Viewing as:</p>
+        <span style={{fontSize:11,color:th.textMuted}}>Region</span>
+        <select value={fltRegion} onChange={function(e){setFltRegion(e.target.value);}} style={Object.assign({},iS,{padding:"6px 9px"})}>
+          <option value="FL">Florida (HQ)</option><option value="All">All regions</option><option value="CA">California</option>
+        </select>
         {team.filter(function(m){return m.nested||canAccess(m.role,"analyticsDeep");}).map(function(m){var idx=team.indexOf(m);var a=intelMember===idx;
           return <button key={m.id} onClick={function(){setIntelMember(idx);}} style={{display:"flex",alignItems:"center",gap:7,padding:"6px 11px",background:a?C.orange+"18":th.inputBg,border:"1px solid "+(a?C.orange:th.borderPlain),borderRadius:11,cursor:"pointer"}}>
             <Avatar name={m.name} size={22}/><span style={{fontSize:11,fontWeight:a?500:400,color:a?C.orange:th.text}}>{m.name.split(" ")[0]}</span>
           </button>;
         })}
       </div>
-      <IntelligenceTab pd={pd} member={team[intelMember]} role={team[intelMember]?team[intelMember].role:"Owner"} th={th} kpiTags={kpiTags} onAiSummary={genAiSummary} aiSummary={aiSummary} summaryLoading={summaryLoading} activeSubTab={intelSub} onSubTabChange={setIntelSub}/>
+      <IntelligenceTab pd={pd} member={team[intelMember]} role={team[intelMember]?team[intelMember].role:"Owner"} th={th} kpiTags={kpiTags} onAiSummary={genAiSummary} aiSummary={aiSummary} summaryLoading={summaryLoading} activeSubTab={intelSub} onSubTabChange={setIntelSub} region={fltRegion} onReportIssue={addRalphIssue}/>
     </div>}
 
     {/* REPORTS — charts & analytics (Increment 1: charts + red-flag categories + RAG + CSV) */}
@@ -1873,7 +1942,12 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
         <div style={{display:"flex",gap:4,background:th.tabBg,border:"1px solid "+th.borderPlain,borderRadius:10,padding:3}}>
           {RANGE_OPTS.map(function(o){var a=fltDays===o.d;return <button key={o.d} onClick={function(){setFltDays(o.d);}} style={{fontSize:11,padding:"6px 11px",borderRadius:8,border:"none",cursor:"pointer",background:a?C.orange+"22":"transparent",color:a?C.orange:th.textMuted,fontWeight:a?500:400}}>{o.l}</button>;})}
         </div>
+        <span style={{fontSize:11,color:th.textMuted}}>Region</span>
+        <select value={fltRegion} onChange={function(e){setFltRegion(e.target.value);}} style={Object.assign({},iS,{padding:"6px 9px"})}>
+          <option value="FL">Florida (HQ)</option><option value="All">All regions</option><option value="CA">California</option>
+        </select>
         <span style={{fontSize:11,color:th.textMuted,background:th.inputBg,border:"1px solid "+th.borderPlain,borderRadius:20,padding:"4px 10px"}}><i className="ti ti-clock" style={{fontSize:12,marginRight:4}} aria-hidden="true"/>Insights through {dmy(OPS_INSIGHTS.dataFreshThrough)}</span>
+        <DatasetReportControl label="Reports overview controls and exports" kpi="Reports" dataPoint="Reports / overview" context={regionName()+" reports, "+owLabel} th={th} onReportIssue={addRalphIssue}/>
         <button onClick={function(){dlCSV(ow.redFlags.categories.map(function(c){return {category:setbackLabel(c.category),sourceCategory:c.category,count:c.count};}),"setback-categories-"+(owIsAll?"all":fltDays+"d")+"-"+todayStr()+".csv");}} style={{display:"flex",alignItems:"center",gap:5,background:th.inputBg,border:"1px solid "+th.borderPlain,borderRadius:20,padding:"7px 14px",color:th.textMuted,fontSize:11,cursor:"pointer"}}><i className="ti ti-download" style={{fontSize:13}} aria-hidden="true"/>Export CSV</button>
       </div>
 
@@ -1887,6 +1961,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
             {RANGES.map(function(r){var a=cmpRange===r;return <button key={r} title={r} onClick={function(){setCmpRange(r);}} style={{padding:"6px 11px",border:"1px solid "+(a?C.orange:th.borderPlain),borderRadius:20,background:a?C.orange+"18":th.inputBg,color:a?C.orange:th.textMuted,fontSize:11,cursor:"pointer",fontWeight:a?500:400}}>{r.split(" ")[0]}</button>;})}
           </div>
+          <DatasetReportControl label="Reports live KPI comparison" kpi="Reports" dataPoint="Live KPIs vs prior period" context={cmpRange+" comparison"} th={th} onReportIssue={addRalphIssue}/>
           <button onClick={function(){setEditTargets(function(e){return !e;});}} style={{display:"flex",alignItems:"center",gap:5,background:editTargets?C.orange+"18":th.inputBg,border:"1px solid "+(editTargets?C.orange:th.borderPlain),borderRadius:20,padding:"7px 12px",color:editTargets?C.orange:th.textMuted,fontSize:11,cursor:"pointer"}}><i className="ti ti-target" style={{fontSize:13}} aria-hidden="true"/>{editTargets?"Done":"Edit targets"}</button>
         </div>
         {cmpInfo.loading?
@@ -1928,60 +2003,60 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
 
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:8,marginBottom:"1rem"}}>
         {[
-          {l:"Active jobs (current)",v:Number(pd.totalActiveJobs||0).toLocaleString(),c:th.text,s:"open jobs in active stages now"},
+          {l:"Active jobs (current)",v:Number(regionActiveJobs||0).toLocaleString(),c:th.text,s:regionName()+" · open jobs in active stages now"},
           {l:"Win rate ("+owLabel+")",v:(rw.winRate==null?"-":rw.winRate+"%"),c:(rw.winRate>=70?cc.green:cc.amber),s:Number(rw.completed||0).toLocaleString()+" completed / "+Number(rw.cancelled||0).toLocaleString()+" cancelled"},
           {l:"Cancellation rate ("+owLabel+")",v:(rw.cancelRate==null?"-":rw.cancelRate+"%"),c:(rw.cancelRate>30?cc.red:rw.cancelRate>15?cc.amber:cc.green),s:Number(rw.cancelled||0).toLocaleString()+" cancelled"},
           {l:"Inspection Red-Tags ("+owLabel+")",v:(rw.inspectionFailRate==null?"-":rw.inspectionFailRate+"%"),c:(rw.inspectionFailRate>30?cc.red:rw.inspectionFailRate>15?cc.amber:cc.green),s:Number(rw.inspectionEvents||0).toLocaleString()+" inspections"},
           {l:"Avg truck rolls / completed job",v:String(OPS_INSIGHTS.truckRolls.meanPerCompletedJob),c:th.text,s:Number(OPS_INSIGHTS.truckRolls.completedJobs||0).toLocaleString()+" completed jobs (PTO reached)"},
           {l:"Clawback at risk (active)",v:Number(OPS_INSIGHTS.reporting.clawbackActive||0).toLocaleString(),c:cc.red,s:Number(OPS_INSIGHTS.reporting.clawbackAtRiskTotal||0).toLocaleString()+" ever flagged"},
         ].map(function(card,i){return <div key={i} style={Object.assign({},glass,{padding:"0.9rem 1rem"})}>
-          <p style={{margin:"0 0 5px",fontSize:11,color:th.textMuted}}>{card.l}</p>
+          <p style={Object.assign({},titleType,{margin:"0 0 5px",fontSize:12,color:th.textMuted})}>{card.l}</p>
           <p style={{margin:0,fontSize:23,fontWeight:600,color:card.c}}>{card.v}</p>
-          <p style={{margin:"3px 0 0",fontSize:10.5,color:th.textMuted}}>{card.s}</p>
+          <p style={Object.assign({},descType,{margin:"3px 0 0",fontSize:10.5,color:th.textMuted})}>{card.s}</p>
         </div>;})}
       </div>
 
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(330px,1fr))",gap:10}}>
         <div style={glass}>
-          <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Setback categories</p>
-          <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Red-Tags are inspection-only. Permitting application issues are tracked separately as permitting setbacks. {ow.redFlags.total.toLocaleString()} setbacks across {ow.redFlags.records.toLocaleString()} jobs &middot; {owLabel}</p>
+          <div style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:2,flexWrap:"wrap"}}><p style={Object.assign({},titleType,{margin:0,fontSize:15,fontWeight:600,color:th.text,flex:1})}>Operational blockers</p><DatasetReportControl label="Reports operational blockers" kpi="Reports" dataPoint="Operational blockers chart" context={owLabel+" operational blockers"} th={th} onReportIssue={addRalphIssue}/></div>
+          <p style={Object.assign({},descType,{margin:"0 0 10px",fontSize:11,color:th.textMuted})}>Red-Tags are inspection-only. Permitting application issues are tracked separately as permitting setbacks. {ow.redFlags.total.toLocaleString()} blockers across {ow.redFlags.records.toLocaleString()} jobs &middot; {owLabel}</p>
           <BarChart th={th} color={cc.red} data={rfChartData(ow.redFlags.categories)}/>
         </div>
 
         <div style={glass}>
-          <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Job outcomes</p>
-          <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>All jobs by current lifecycle phase</p>
-          <DonutChart th={th} data={OPS_INSIGHTS.funnel.outcomes.map(function(o,i){return {label:o.label,value:o.count,color:[cc.blue,cc.green,cc.teal,cc.red,cc.amber,cc.neutral][i]};})}/>
+          <div style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:2,flexWrap:"wrap"}}><p style={Object.assign({},titleType,{margin:0,fontSize:15,fontWeight:600,color:th.text,flex:1})}>Job outcomes</p><DatasetReportControl label="Reports job outcomes" kpi="Reports" dataPoint="Job outcomes chart" context={owLabel+" job outcomes"} th={th} onReportIssue={addRalphIssue}/></div>
+          <p style={Object.assign({},descType,{margin:"0 0 10px",fontSize:11,color:th.textMuted})}>{owIsAll?"All jobs by current lifecycle phase":"Resolved jobs in "+owLabel}</p>
+          <DonutChart th={th} data={rangeOutcomeData.map(function(o,i){return {label:o.label,value:o.count,color:[cc.blue,cc.green,cc.teal,cc.red,cc.amber,cc.neutral][i]};})}/>
         </div>
 
         <div style={glass}>
-          <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Cycle times (median days)</p>
-          <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Days between milestones &middot; {owLabel}</p>
+          <div style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:2,flexWrap:"wrap"}}><p style={Object.assign({},titleType,{margin:0,fontSize:15,fontWeight:600,color:th.text,flex:1})}>Cycle times (median days)</p><DatasetReportControl label="Reports cycle times" kpi="Reports" dataPoint="Cycle times chart" context={owLabel+" cycle times"} th={th} onReportIssue={addRalphIssue}/></div>
+          <p style={Object.assign({},descType,{margin:"0 0 10px",fontSize:11,color:th.textMuted})}>Days between milestones &middot; {owLabel}</p>
           <BarChart th={th} color={cc.blue} format="days" data={ow.cycleTimes.filter(function(c){return c.median!=null;}).map(function(c){return {label:c.label,value:c.median};})}/>
         </div>
 
         <div style={glass}>
-          <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Where jobs cancel</p>
-          <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Stage when cancelled (% of cancellations)</p>
-          <BarChart th={th} color={cc.red} format="pct" data={OPS_INSIGHTS.cancellations.where.map(function(w){return {label:w.board,value:w.pct};})}/>
+          <div style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:2,flexWrap:"wrap"}}><p style={Object.assign({},titleType,{margin:0,fontSize:15,fontWeight:600,color:th.text,flex:1})}>Where jobs cancel</p><DatasetReportControl label="Reports cancellation location" kpi="Reports" dataPoint="Where jobs cancel chart" context={regionName()+" cancellations"} th={th} onReportIssue={addRalphIssue}/></div>
+          <p style={Object.assign({},descType,{margin:"0 0 10px",fontSize:11,color:th.textMuted})}>Stage when cancelled (% of cancellations) &middot; {regionName()}</p>
+          <BarChart th={th} color={cc.red} format="pct" data={cancellationWhereData}/>
         </div>
 
         <div style={glass}>
-          <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>How long before cancelling</p>
+          <div style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:2,flexWrap:"wrap"}}><p style={{margin:0,fontSize:14,fontWeight:500,color:th.text,flex:1}}>How long before cancelling</p><DatasetReportControl label="Reports cancellation age" kpi="Reports" dataPoint="How long before cancelling chart" context="Cancellation age buckets" th={th} onReportIssue={addRalphIssue}/></div>
           <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Age at cancellation (% of cancellations)</p>
           <BarChart th={th} color={cc.amber} format="pct" data={OPS_INSIGHTS.cancellations.ageBuckets.map(function(a){return {label:a.label,value:a.pct};})}/>
         </div>
 
         <div style={glass}>
-          <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Active jobs by board {pd.isLive?"":"(simulated)"}</p>
-          <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Live pipeline &middot; {pd.totalActiveJobs} active jobs</p>
-          <BarChart th={th} color={cc.orange} data={Object.keys(pd.boards).map(function(b){return {label:b,value:pd.boards[b].jobCount};}).filter(function(d){return d.value>0;}).sort(function(a,b){return b.value-a.value;}).slice(0,10)}/>
+          <div style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:2,flexWrap:"wrap"}}><p style={{margin:0,fontSize:14,fontWeight:500,color:th.text,flex:1}}>Active jobs by board {pd.isLive?"":"(simulated)"}</p><DatasetReportControl label="Reports active jobs by board" kpi="Reports" dataPoint="Active jobs by board chart" context={regionName()+" active jobs"} th={th} onReportIssue={addRalphIssue}/></div>
+          <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Live pipeline &middot; {regionActiveJobs} active jobs &middot; {regionName()}</p>
+          <BarChart th={th} color={cc.orange} data={regionBoardNames.map(function(b){return {label:b,value:pd.boards[b].jobCount};}).filter(function(d){return d.value>0;}).sort(function(a,b){return b.value-a.value;}).slice(0,10)}/>
         </div>
 
         <div style={Object.assign({},glass,{gridColumn:"1/-1"})}>
-          <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Cancellations per month</p>
+          <div style={{display:"flex",alignItems:"flex-start",gap:8,marginBottom:2,flexWrap:"wrap"}}><p style={{margin:0,fontSize:14,fontWeight:500,color:th.text,flex:1}}>Cancellations per month</p><DatasetReportControl label="Reports cancellations per month" kpi="Reports" dataPoint="Cancellations per month chart" context={owLabel+" monthly cancellations"} th={th} onReportIssue={addRalphIssue}/></div>
           <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Trend over time</p>
-          <LineChart th={th} color={cc.orange} goal={CANCELLATIONS_PER_MONTH_TARGET} goalColor={cc.amber} data={OPS_INSIGHTS.cancellations.monthly.map(function(m){return {label:monthYear(m.month,true),value:m.count};})}/>
+          <LineChart th={th} color={cc.orange} goal={CANCELLATIONS_PER_MONTH_TARGET} goalColor={cc.amber} data={cancellationMonths.map(function(m){var pct=(Number(m.count||0)/cancellationMonthTotal*100);return {label:monthYear(m.month,true),value:m.count,tip:monthYear(m.month)+"\nCount: "+Number(m.count||0).toLocaleString()+" cancellations\nShare: "+pct.toFixed(1)+"% of selected range\nReasons: not exported monthly yet"};})}/>
         </div>
       </div>
     </div>}
