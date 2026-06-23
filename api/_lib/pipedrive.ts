@@ -12,6 +12,9 @@
 import { terminalStageIds } from "../../shared/domain/terminal-stages.js";
 import { BOARDS } from "../../shared/domain/boards.js";
 
+const IGNORED_PIPELINE_NAMES = new Set(["system monitoring"]);
+const normName = (s: unknown): string => String(s ?? "").trim().toLowerCase();
+
 export type PipedriveDeal = {
   id: number;
   title: string;
@@ -58,7 +61,7 @@ export type PipelineData = {
   // Aggregates (pre-computed so resolvers don't re-iterate)
   totalActiveJobs: number;
   totalPipelineValue: number;          // sum of all open deal values
-  endToEndDays: number;                // sum of active stage avgDays across stages with deals
+  endToEndDays: number;                // weighted average age of active deals
   wonThisWeek: number;                 // count of deals won since Monday ET
   wonThisWeekValue: number;            // sum of value, won since Monday ET
   wonLast30d: number;                  // count, won in last 30 days
@@ -190,11 +193,16 @@ export async function pullPipedrive(domain: string, apiKey: string): Promise<Pip
     pdGetAll("/activities?done=0"),
   ]);
 
-  const pipelinesArr = Array.isArray(pipelinesRaw) ? pipelinesRaw : [];
+  const pipelinesArr = (Array.isArray(pipelinesRaw) ? pipelinesRaw : [])
+    .filter((p: any) => !IGNORED_PIPELINE_NAMES.has(normName(p?.name)));
   const stagesArr = Array.isArray(stagesRaw) ? stagesRaw : [];
-  const openDeals = Array.isArray(openDealsRaw) ? openDealsRaw : [];
-  const wonDeals = Array.isArray(wonDealsRaw) ? wonDealsRaw : [];
-  const lostDeals = Array.isArray(lostDealsRaw) ? lostDealsRaw : [];
+  const activePipelineIds = new Set(pipelinesArr.map((p: any) => p.id));
+  const openDeals = (Array.isArray(openDealsRaw) ? openDealsRaw : [])
+    .filter((d: any) => activePipelineIds.has(d.pipeline_id));
+  const wonDeals = (Array.isArray(wonDealsRaw) ? wonDealsRaw : [])
+    .filter((d: any) => activePipelineIds.has(d.pipeline_id));
+  const lostDeals = (Array.isArray(lostDealsRaw) ? lostDealsRaw : [])
+    .filter((d: any) => activePipelineIds.has(d.pipeline_id));
   const activities = Array.isArray(activitiesRaw) ? activitiesRaw : [];
 
   // Current pipeline speed/bottleneck metrics must ignore completed terminal stages that are still
@@ -357,10 +365,8 @@ export async function pullPipedrive(domain: string, apiKey: string): Promise<Pip
   const techniciansScheduledToday = countOpenAt("Service Scheduled", todayYMD);
   const inspectionsScheduledToday = countOpenAt("Inspection Scheduled", todayYMD);
 
-  const endToEndDays = Object.values(boardData)
-    .reduce((sum, b) => sum + b.stages
-      .filter((st) => st.count > 0)
-      .reduce((stageSum, st) => stageSum + st.avgDays, 0), 0);
+  const activeAgeDays = activeOpenDeals.reduce((sum: number, d: any) => sum + daysSince(d.stage_change_time || d.add_time), 0);
+  const endToEndDays = activeOpenDeals.length > 0 ? activeAgeDays / activeOpenDeals.length : 0;
 
   return {
     boardData,
