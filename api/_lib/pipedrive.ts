@@ -10,6 +10,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { terminalStageIds } from "../../shared/domain/terminal-stages.js";
+import { BOARDS } from "../../shared/domain/boards.js";
 
 export type PipedriveDeal = {
   id: number;
@@ -57,7 +58,7 @@ export type PipelineData = {
   // Aggregates (pre-computed so resolvers don't re-iterate)
   totalActiveJobs: number;
   totalPipelineValue: number;          // sum of all open deal values
-  endToEndDays: number;                // sum of board avgDays across boards with deals
+  endToEndDays: number;                // sum of active stage avgDays across stages with deals
   wonThisWeek: number;                 // count of deals won since Monday ET
   wonThisWeekValue: number;            // sum of value, won since Monday ET
   wonLast30d: number;                  // count, won in last 30 days
@@ -196,11 +197,16 @@ export async function pullPipedrive(domain: string, apiKey: string): Promise<Pip
   const lostDeals = Array.isArray(lostDealsRaw) ? lostDealsRaw : [];
   const activities = Array.isArray(activitiesRaw) ? activitiesRaw : [];
 
+  // Current pipeline speed/bottleneck metrics must ignore completed terminal stages that are still
+  // open in Pipedrive, otherwise old AR/PTO/cancellation backlog can dominate averages for years.
+  const terminalIds = terminalStageIds(pipelinesArr as any[], stagesArr as any[]);
+  const activeOpenDeals = openDeals.filter((d: any) => !terminalIds.has(d.stage_id));
+
   // ── Build boardData with stage + board value aggregates ──
   const boardData: Record<string, PipedriveBoard> = {};
   pipelinesArr.forEach((p: any) => {
     const pipelineStages = stagesArr.filter((s: any) => s.pipeline_id === p.id);
-    const pipelineDeals = openDeals.filter((d: any) => d.pipeline_id === p.id);
+    const pipelineDeals = activeOpenDeals.filter((d: any) => d.pipeline_id === p.id);
 
     const stageRows: PipedriveStage[] = pipelineStages
       .sort((a: any, b: any) => (a.order_nr || 0) - (b.order_nr || 0))
@@ -234,18 +240,17 @@ export async function pullPipedrive(domain: string, apiKey: string): Promise<Pip
     };
   });
 
-  // ── Stalled deals (≥1.5x board avg, min 7d) ──
+  // ── Stalled deals: current active deals past their configured stage rotting goal ──
   const stalled: StalledDeal[] = [];
   Object.keys(boardData).forEach((boardName) => {
     const board = boardData[boardName];
-    const totalDays = board.stages.reduce((s, st) => s + st.avgDays * st.count, 0);
-    const totalCount = board.stages.reduce((s, st) => s + st.count, 0);
-    if (totalCount === 0) return;
-    const boardAvg = totalDays / totalCount;
-    const threshold = Math.max(7, Math.round(boardAvg * 1.5));
+    const boardCfg = BOARDS[boardName];
+    if (!boardCfg) return;
     board.stages.forEach((st) => {
+      const threshold = boardCfg.rotting[st.name];
+      if (!threshold) return;
       st.deals.forEach((d) => {
-        if (d.days >= threshold) {
+        if (d.days > threshold) {
           st.stuckCount += 1;
           stalled.push({
             board: boardName, stage: st.name, dealId: d.id, title: d.title,
@@ -282,13 +287,6 @@ export async function pullPipedrive(domain: string, apiKey: string): Promise<Pip
 
   // ── Aggregates ──
   const totalPipelineValue = openDeals.reduce((sum: number, d: any) => sum + Number(d.value || 0), 0);
-
-  // "Active jobs" = open deals NOT parked in a completed/terminal stage (PTO reached, cancellation
-  // processed, Mx invoice sent, job complete, serviced). Mirrors the solar pipeline's terminal-stage
-  // definition so the headline count is genuine field work (~hundreds), not the ~16k open backlog
-  // (which includes the Funding AR pile, PTO-paid, processed cancellations). See shared/domain/terminal-stages.ts.
-  const terminalIds = terminalStageIds(pipelinesArr as any[], stagesArr as any[]);
-  const activeOpenDeals = openDeals.filter((d: any) => !terminalIds.has(d.stage_id));
 
   const mondayYMD = startOfWeekETIso();
   const todayYMD = easternYMD();
@@ -360,8 +358,9 @@ export async function pullPipedrive(domain: string, apiKey: string): Promise<Pip
   const inspectionsScheduledToday = countOpenAt("Inspection Scheduled", todayYMD);
 
   const endToEndDays = Object.values(boardData)
-    .filter((b) => b.totalDeals > 0)
-    .reduce((sum, b) => sum + b.avgDays, 0);
+    .reduce((sum, b) => sum + b.stages
+      .filter((st) => st.count > 0)
+      .reduce((stageSum, st) => stageSum + st.avgDays, 0), 0);
 
   return {
     boardData,

@@ -35,6 +35,19 @@ const C={orange:"#F28F1D",orangeDeep:"#D9511C",green:"#22C55E",amber:"#F59E0B",r
 
 const RANGES=["Week over week","Month over month","Quarter over quarter","Year over year"];
 
+function goalBenchmarkDaysForBoards(boardNames){
+  return boardNames.reduce(function(total,bName){
+  var cfg=BOARDS[bName];if(!cfg)return total;
+  return total+cfg.stages.reduce(function(sum,sName){
+    if(isTerminalStage(bName,sName))return sum;
+    var threshold=cfg.rotting[sName];
+    return sum+(threshold?Number(threshold):0);
+  },0);
+},0);
+}
+
+const GOAL_BENCHMARK_DAYS=goalBenchmarkDaysForBoards(Object.keys(BOARDS));
+
 // ─────────────────────────────────────────────
 // DATA MODEL — derived view of pipelineData; domain constants imported from ../shared/domain
 function buildPipelineData(liveApiData) {
@@ -43,6 +56,7 @@ function buildPipelineData(liveApiData) {
   var totalActiveJobs=0;
   var totalStuck=0;
   var allDeals=[];
+  var activeDeals=[];
 
   boardNames.forEach(function(bName) {
     var cfg=BOARDS[bName];
@@ -67,7 +81,8 @@ function buildPipelineData(liveApiData) {
 
       if(liveStage&&liveStage.deals) {
         deals=liveStage.deals.map(function(d) {
-          return {id:d.id,name:d.name||d.title||"Unknown",address:"",days:d.days,rep:d.ownerName||"Unassigned",pipedriveUrl:d.url||d.pipedriveUrl,notes:[],flags:d.days>(threshold||999)?["Past rotting threshold"]:[]};
+          var notes=Array.isArray(d.notes)?d.notes:(d.note?[{date:d.noteDate||d.updateTime||d.update_time,text:String(d.note)}]:[]);
+          return {id:d.id,name:d.name||d.title||"Unknown",address:"",board:bName,stage:sName,days:d.days,rep:d.ownerName||"Unassigned",pipedriveUrl:d.url||d.pipedriveUrl,notes:notes,flags:d.days>(threshold||999)?["Past rotting threshold"]:[]};
         });
       }
 
@@ -79,6 +94,7 @@ function buildPipelineData(liveApiData) {
       // processed, job complete, serviced) so "active jobs" + the by-board bars reflect genuine field work,
       // not the done backlog (Funding AR, Completed Meter, etc.). See shared/domain/terminal-stages.
       if(isTerminalStage(bName,sName)) return;
+      deals.forEach(function(d){activeDeals.push(Object.assign({},d,{board:bName,stage:sName}));});
       boardTotalJobs+=jobCount;
       boardTotalDays+=avgDays*jobCount;
       boardStuck+=stuckCount;
@@ -95,33 +111,37 @@ function buildPipelineData(liveApiData) {
     boards[bName]={name:bName,region:cfg.region,jobCount:boardTotalJobs,avgDays:boardAvgDays,stuckCount:boardStuck,totalValue:boardTotalValue,status:status,stages:stages,live:!!(liveApiData&&liveApiData.boardData&&liveApiData.boardData[bName])};
   });
 
-  // End-to-end: sum of board averages (only boards with deals)
-  var endToEndDays=Object.values(boards).reduce(function(sum,b){return sum+(b.jobCount>0?b.avgDays:0);},0);
+  // End-to-end: sum of current active stage averages (terminal stages excluded above).
+  var endToEndDays=Object.values(boards).reduce(function(sum,b){
+    return sum+Object.values(b.stages).reduce(function(stageSum,s){
+      return stageSum+(!isTerminalStage(b.name,s.name)&&s.jobCount>0?Number(s.avgDays||0):0);
+    },0);
+  },0);
 
-  // Bottleneck detection: stages where avgDays significantly exceeds the board's average
-  // Real definition: avgDays >= 1.5x board avg, minimum 7 days, must have at least 1 deal.
+  // Bottleneck detection: current active stages where avgDays exceeds the configured rotting goal.
   var bottlenecks=[];
   Object.values(boards).forEach(function(b) {
-    if(b.jobCount===0||b.avgDays===0)return;
-    var threshold=Math.max(7,b.avgDays*1.5);
+    if(b.jobCount===0)return;
     Object.values(b.stages).forEach(function(s) {
-      if(s.jobCount>0&&s.avgDays>=threshold) {
+      if(isTerminalStage(b.name,s.name))return;
+      if(s.jobCount>0&&s.threshold&&s.avgDays>s.threshold) {
         bottlenecks.push({
           board:b.name,
           stage:s.name,
-          stuckCount:s.jobCount,
+          stuckCount:s.stuckCount,
           avgDays:s.avgDays,
           boardAvg:b.avgDays,
-          pctAbove:b.avgDays>0?Math.round(((s.avgDays-b.avgDays)/b.avgDays)*100):0
+          threshold:s.threshold,
+          pctAbove:Math.round(((s.avgDays-s.threshold)/s.threshold)*100)
         });
       }
     });
   });
   bottlenecks.sort(function(a,b){return b.pctAbove-a.pctAbove;});
 
-  // Rep stats from real allDeals data only (real owner names come from Pipedrive)
+  // Rep stats in Intelligence are current-work only; terminal backlog would distort owner averages.
   var repStats={};
-  allDeals.forEach(function(d) {
+  activeDeals.forEach(function(d) {
     var rep=d.rep||"Unassigned";
     if(!repStats[rep])repStats[rep]={rep:rep,jobCount:0,totalDays:0};
     repStats[rep].jobCount++;
@@ -138,6 +158,7 @@ function buildPipelineData(liveApiData) {
     totalActiveJobs:totalActiveJobs,
     totalStuck:totalStuck,
     endToEndDays:parseFloat(endToEndDays.toFixed(1)),
+    goalBenchDays:GOAL_BENCHMARK_DAYS,
     bottlenecks:bottlenecks,
     repStats:repStats,
     allDeals:allDeals,
@@ -161,7 +182,9 @@ function buildPipelineData(liveApiData) {
 
 const AUDIT_INIT: Array<{id:number;ts:string;user:string;action:string;detail:string;type:string;draft:boolean}>=[];
 
-const RALPH_INIT: Array<{id:number;ts:string;reporter:string;issue:string;kpi:string;status:string;stage:string;correction:string;aiNote:string}>=[];
+const RALPH_INIT: Array<{id:number;ts:string;reporter:string;issue:string;kpi:string;status:string;stage:string;correction:string;aiNote:string;bugType?:string;dataPoint?:string;context?:string}>=[];
+
+const BUG_TYPES=["Data accuracy","Layout / visual","Usability","Missing context","Performance","Other"];
 
 const RALPH_STAGES=[
   {stage:"R - Reported",desc:"Issue flagged by a user",col:C.red},
@@ -475,14 +498,32 @@ function CronStatusBanner({status,th}){
 // ─────────────────────────────────────────────
 // DEAL CARD — reused across all drill-downs
 // ─────────────────────────────────────────────
+function normaliseDealNotes(deal){
+  return (Array.isArray(deal.notes)?deal.notes:[]).filter(function(n){return n&&n.text;});
+}
+
+function dealHoldInsight(deal,threshold){
+  var notes=normaliseDealNotes(deal);
+  if(notes.length>0)return "Latest note: "+notes[0].text;
+  var days=Number(deal.days||0);
+  var stage=String(deal.stage||"");
+  if(/hold/i.test(stage))return "No CRM note detail came through on this pull. This is a hold stage, so open Pipedrive for the specific hold reason.";
+  if(threshold&&days>threshold)return "No CRM note detail came through on this pull. It has not moved stages in "+days+" days, which is "+(days-threshold)+" days over the "+threshold+"d rotting goal.";
+  if(days>0)return "No CRM note detail came through on this pull. It has not moved stages in "+days+" days.";
+  return "No CRM note detail came through on this pull yet, and this deal has no stage-age signal to explain a hold.";
+}
+
 function DealCard({deal,threshold,th}){
   var [open,setOpen]=useState(false);
   var over=threshold&&deal.days>threshold;
+  var notes=normaliseDealNotes(deal);
+  var insight=dealHoldInsight(deal,threshold);
   return <div style={{background:th.inputBg,border:"1px solid "+(over?C.red+"55":th.borderPlain),borderRadius:9,overflow:"hidden",marginBottom:4}}>
     <button onClick={function(){setOpen(!open);}} style={{width:"100%",display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:"transparent",border:"none",cursor:"pointer",textAlign:"left"}}>
       <div style={{flex:1}}>
         <p style={{margin:0,fontSize:12,fontWeight:500,color:th.text}}>{deal.name}</p>
         <p style={{margin:0,fontSize:11,color:th.textMuted}}>{deal.stage} &middot; {deal.board}</p>
+        <p style={{margin:"2px 0 0",fontSize:10,color:over?C.amber:th.textMuted,lineHeight:1.35}}>{insight}</p>
       </div>
       <span style={{fontSize:12,fontWeight:500,color:over?C.red:C.green}}>{deal.days}d</span>
       <span style={{fontSize:11,color:th.textMuted}}>{deal.rep}</span>
@@ -492,8 +533,13 @@ function DealCard({deal,threshold,th}){
     {open&&<div style={{borderTop:"1px solid "+th.borderPlain,padding:"8px 10px"}}>
       <p style={{margin:"0 0 6px",fontSize:11,color:th.textMuted}}>{deal.address}</p>
       {deal.flags&&deal.flags.length>0&&<div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:6}}>{deal.flags.map(function(f){return <span key={f} style={{fontSize:11,color:C.amber,background:C.amber+"15",padding:"1px 6px",borderRadius:5}}>! {f}</span>;})}</div>}
+      <div style={{padding:"6px 8px",background:over?C.amber+"10":th.card,border:"1px solid "+(over?C.amber+"33":th.borderPlain),borderRadius:7,marginBottom:7}}>
+        <p style={{margin:"0 0 2px",fontSize:11,color:th.textMuted,letterSpacing:"0.3px"}}>Hold readout</p>
+        <p style={{margin:0,fontSize:11,color:th.text,lineHeight:1.45}}>{insight}</p>
+      </div>
       <p style={{margin:"0 0 5px",fontSize:11,color:th.textMuted,letterSpacing:"0.3px"}}>Notes</p>
-      {(deal.notes||[]).map(function(n,i){return <div key={i} style={{padding:"4px 8px",background:th.card,borderRadius:6,borderLeft:"2px solid "+(i===0?C.orange:"rgba(150,150,150,0.3)"),marginBottom:3}}>
+      {notes.length===0&&<p style={{margin:0,fontSize:11,color:th.textMuted}}>No CRM notes were included in this pull, so the readout is based on stage age and rotting goal only.</p>}
+      {notes.map(function(n,i){return <div key={i} style={{padding:"4px 8px",background:th.card,borderRadius:6,borderLeft:"2px solid "+(i===0?C.orange:"rgba(150,150,150,0.3)"),marginBottom:3}}>
         <p style={{margin:0,fontSize:11,color:th.textMuted}}>{dmy(n.date)}</p>
         <p style={{margin:0,fontSize:11,color:th.text}}>{n.text}</p>
       </div>;})}
@@ -506,12 +552,23 @@ function DealCard({deal,threshold,th}){
 // Opens when a KPI value is clicked
 // Derives all data from pipelineData
 // ─────────────────────────────────────────────
-function KpiDrillDown({kpiName,pd,memberBoards,role,onClose,th,onNavigateIntelligence}){
+function KpiDrillDown({kpiName,pd,memberBoards,role,onClose,th,onNavigateIntelligence,onReportBug}){
   var [expBoard,setExpBoard]=useState(null);
   var [expStage,setExpStage]=useState(null);
   var [dealFilter,setDealFilter]=useState("rotten");
+  var [showBug,setShowBug]=useState(false);
+  var [bugType,setBugType]=useState(BUG_TYPES[0]);
+  var [bugPoint,setBugPoint]=useState("KPI summary");
+  var [bugNote,setBugNote]=useState("");
+  var [bugSent,setBugSent]=useState(false);
 
   var relevantBoards=(memberBoards||Object.keys(BOARDS)).filter(function(b){return pd.boards[b];});
+  var dataPoints=["KPI summary"].concat(relevantBoards.reduce(function(list,bName){
+    var b=pd.boards[bName];if(!b)return list;
+    list.push(bName+" board total");
+    Object.values(b.stages||{}).filter(function(s){return s.jobCount>0;}).forEach(function(s){list.push(bName+" / "+s.name);});
+    return list;
+  },[]));
 
   var filteredDeals=useCallback(function(deals,threshold){
     if(dealFilter==="rotten")return deals.filter(function(d){return threshold&&d.days>threshold;});
@@ -527,11 +584,25 @@ function KpiDrillDown({kpiName,pd,memberBoards,role,onClose,th,onNavigateIntelli
           <p style={{margin:0,fontSize:15,fontWeight:500,color:th.text}}>{kpiName}</p>
           <p style={{margin:0,fontSize:11,color:th.textMuted}}>Breakdown across {relevantBoards.length} boards &middot; {pd.totalActiveJobs} total active jobs</p>
         </div>
+        <button onClick={function(){setShowBug(!showBug);setBugSent(false);}} style={{background:C.red+"12",border:"1px solid "+C.red+"44",borderRadius:8,color:C.red,fontSize:11,padding:"4px 10px",cursor:"pointer"}}>Report a bug</button>
         <button onClick={function(){onNavigateIntelligence("Bottlenecks");}} style={{background:C.orange+"18",border:"1px solid "+C.orange+"44",borderRadius:8,color:C.orange,fontSize:11,padding:"4px 10px",cursor:"pointer"}}>Deep analysis</button>
         <button onClick={onClose} style={{background:"transparent",border:"none",color:th.textMuted,cursor:"pointer",fontSize:18,padding:"0 4px"}}>x</button>
       </div>
 
       <div style={{padding:"14px 18px"}}>
+        {showBug&&<div style={{background:C.red+"08",border:"1px solid "+C.red+"33",borderRadius:12,padding:"10px 12px",marginBottom:12}}>
+          <p style={{margin:"0 0 4px",fontSize:12,fontWeight:500,color:C.red}}>Report this KPI to RALPH</p>
+          <p style={{margin:"0 0 8px",fontSize:11,color:th.textMuted,lineHeight:1.45}}>Tag the exact data point that looks wrong, choose the bug type, and add a short note. It will appear in the RALPH section for review.</p>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:8,marginBottom:8}}>
+            <label><span style={{display:"block",margin:"0 0 3px",fontSize:11,color:th.textMuted}}>Bug type</span><select value={bugType} onChange={function(e){setBugType(e.target.value);}} style={{width:"100%",background:th.selectBg,border:"1px solid "+th.inputBorder,borderRadius:9,color:th.selectText,fontSize:12,padding:"7px 9px"}}>{BUG_TYPES.map(function(t){return <option key={t} style={{background:th.selectBg,color:th.selectText}}>{t}</option>;})}</select></label>
+            <label><span style={{display:"block",margin:"0 0 3px",fontSize:11,color:th.textMuted}}>Tagged data point</span><select value={bugPoint} onChange={function(e){setBugPoint(e.target.value);}} style={{width:"100%",background:th.selectBg,border:"1px solid "+th.inputBorder,borderRadius:9,color:th.selectText,fontSize:12,padding:"7px 9px"}}>{dataPoints.map(function(p){return <option key={p} style={{background:th.selectBg,color:th.selectText}}>{p}</option>;})}</select></label>
+          </div>
+          <textarea value={bugNote} onChange={function(e){setBugNote(e.target.value);}} placeholder="What seems off? Example: count looks too high, chart is hard to read, missing explanation..." rows={2} style={{width:"100%",resize:"vertical",boxSizing:"border-box",background:th.inputBg,border:"1px solid "+th.inputBorder,borderRadius:9,color:th.text,fontSize:12,padding:"8px 10px",fontFamily:"inherit",marginBottom:8}}/>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <button onClick={function(){if(!bugNote.trim())return;onReportBug&&onReportBug({kpi:kpiName,bugType:bugType,dataPoint:bugPoint,issue:bugNote.trim(),context:"KPI drill-down: "+kpiName+" / "+bugPoint});setBugNote("");setBugSent(true);}} style={{background:"linear-gradient(135deg,"+C.orange+","+C.orangeDeep+")",border:"none",borderRadius:9,color:"#fff",fontWeight:500,fontSize:12,padding:"7px 12px",cursor:bugNote.trim()?"pointer":"not-allowed",opacity:bugNote.trim()?1:0.55}}>Send to RALPH</button>
+            {bugSent&&<span style={{fontSize:11,color:C.green}}>Sent to RALPH.</span>}
+          </div>
+        </div>}
         <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
           {[{k:"rotten",l:"Rotten only"},{k:"slow",l:"Slower than avg"},{k:"top10",l:"Top 10% slowest"},{k:"all",l:"All deals"}].map(function(f){
             return <button key={f.k} onClick={function(){setDealFilter(f.k);}} style={{padding:"4px 10px",border:"1px solid "+(dealFilter===f.k?C.orange:th.borderPlain),borderRadius:20,background:dealFilter===f.k?C.orange+"18":th.inputBg,color:dealFilter===f.k?C.orange:th.textMuted,fontSize:11,cursor:"pointer",fontWeight:dealFilter===f.k?500:400}}>{f.l}</button>;
@@ -587,7 +658,7 @@ function KpiDrillDown({kpiName,pd,memberBoards,role,onClose,th,onNavigateIntelli
 
 // ─────────────────────────────────────────────
 // INTELLIGENCE TAB
-// 4 sub-tabs: Overview, Pipeline Speed, Bottlenecks, History
+// 4 sub-tabs: Overview, Heat Map, Bottlenecks, History
 // All powered by pipelineData
 // ─────────────────────────────────────────────
 function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summaryLoading,activeSubTab,onSubTabChange}){
@@ -598,6 +669,11 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
   var [heatExpand,setHeatExpand]=useState(null);
   var memberBoards=(member.boards||[]).filter(function(b){return pd.boards[b];});
   var showRepData=canAccess(role,"repData");
+  var goalBenchDays=pd.goalBenchDays||GOAL_BENCHMARK_DAYS;
+  function heatmapStagesFor(bName){var b=pd.boards[bName];return b?Object.values(b.stages).filter(function(s){return s.jobCount>0&&!isTerminalStage(bName,s.name);}):[];}
+  var speedBoards=(memberBoards.length?memberBoards:Object.keys(pd.boards||{})).filter(function(bName){return heatmapStagesFor(bName).length>0;});
+  var speedEndToEndDays=parseFloat(speedBoards.reduce(function(sum,bName){return sum+heatmapStagesFor(bName).reduce(function(stageSum,s){return stageSum+Number(s.avgDays||0);},0);},0).toFixed(1));
+  var speedBenchmarkDays=speedBoards.reduce(function(sum,bName){return sum+heatmapStagesFor(bName).reduce(function(stageSum,s){return stageSum+(s.threshold?Number(s.threshold):0);},0);},0);
 
   // Snapshot accumulation state — fetched lazily when History sub-tab opens
   var [snapInfo,setSnapInfo]=useState({loading:false,loaded:false,count:0,oldest:null,newest:null,error:null});
@@ -654,7 +730,7 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
   }
 
   return <div>
-    <SubTab tabs={["Overview","Pipeline Speed","Bottlenecks","History"]} active={sub} onChange={setSub} th={th}/>
+    <SubTab tabs={["Overview","Heat Map","Bottlenecks","History"]} active={sub} onChange={setSub} th={th}/>
 
     {sub==="Overview"&&<div>
       {pd.isLive&&<div style={{background:C.green+"0d",border:"1px solid "+C.green+"22",borderRadius:10,padding:"7px 12px",marginBottom:"1rem"}}>
@@ -664,9 +740,9 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:8,marginBottom:"1rem"}}>
         {[
           {l:"Active jobs",v:pd.totalActiveJobs,col:C.orange,tip:"Open deals still in an active stage. Completed/terminal stages (PTO reached, milestone invoiced, cancellation processed, serviced) are excluded. Pulled live when you click 'Pull live data'."},
-          {l:"Stuck jobs",v:pd.totalStuck,col:C.red,tip:"Deals in stages where the average days-in-stage is over 30% above that board's overall average. Indicates bottleneck pressure, not individual deal age."},
-          {l:"End-to-end avg",v:pd.endToEndDays+"d",col:C.blue,tip:"Sum of average days-in-stage across all your boards. Approximates total pipeline time from first stage to install."},
-          {l:"Industry bench",v:INDUSTRY_BENCHMARK_DAYS+"d",col:th.textMuted,tip:"Industry average end-to-end pipeline time. For comparison only — your number above is what matters."}
+          {l:"Stuck jobs",v:pd.totalStuck,col:C.red,tip:"Current active deals past the configured rotting goal for their stage. Completed/terminal stages are excluded."},
+          {l:"End-to-end avg",v:pd.endToEndDays+"d",col:C.blue,tip:"Sum of current active average days-in-stage across non-terminal stages. Completed/terminal stages are excluded."},
+          {l:"Goal bench",v:goalBenchDays+"d",col:th.textMuted,tip:"Sum of configured rotting goals for non-terminal pipeline stages. This replaces the generic industry benchmark as the target to beat."}
         ].map(function(s){
           return <div key={s.l} title={s.tip} style={{background:s.col+"0d",border:"1px solid "+s.col+"22",borderRadius:10,padding:"10px 12px",textAlign:"center",cursor:"help"}}>
             <p style={{margin:0,fontSize:20,fontWeight:500,color:s.col}}>{s.v}</p>
@@ -703,19 +779,22 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
       </div>
     </div>}
 
-    {sub==="Pipeline Speed"&&<div>
+    {sub==="Heat Map"&&<div>
       <div style={{display:"flex",gap:8,marginBottom:"1rem",alignItems:"center",flexWrap:"wrap"}}>
         <div style={{flex:1}}>
-          <p style={{margin:0,fontSize:13,fontWeight:500,color:th.text}}>End-to-end avg: <span style={{color:C.orange}}>{pd.endToEndDays} days</span> &nbsp; Industry benchmark: <span style={{color:th.textMuted}}>{INDUSTRY_BENCHMARK_DAYS} days</span></p>
-          <p style={{margin:"3px 0 0",fontSize:11,color:pd.endToEndDays>INDUSTRY_BENCHMARK_DAYS?C.red:C.green}}>{pd.endToEndDays>INDUSTRY_BENCHMARK_DAYS?"Above industry benchmark by "+(pd.endToEndDays-INDUSTRY_BENCHMARK_DAYS)+"d":"Within industry benchmark"}</p>
+          <p style={{margin:0,fontSize:13,fontWeight:500,color:th.text}}>End-to-end avg: <span style={{color:C.orange}}>{speedEndToEndDays} days</span> &nbsp; Industry benchmark: <span style={{color:th.textMuted}}>{speedBenchmarkDays} days</span></p>
+          <p style={{margin:"3px 0 0",fontSize:11,color:speedEndToEndDays>speedBenchmarkDays?C.red:C.green}}>{speedEndToEndDays>speedBenchmarkDays?"Above industry benchmark by "+(speedEndToEndDays-speedBenchmarkDays).toFixed(1)+"d":"Within industry benchmark"}</p>
         </div>
       </div>
 
-      <p style={{margin:"0 0 8px",fontSize:12,color:th.textMuted}}>Heat map &mdash; avg days per stage. Colour: green = fast, amber = near threshold, red = slow. Click a cell to see deals.</p>
+      <div style={{margin:"0 0 12px",padding:"10px 12px",background:th.inputBg,border:"1px solid "+th.borderPlain,borderRadius:10}}>
+        <p style={{margin:"0 0 4px",fontSize:12,fontWeight:500,color:th.text}}>How to use this heat map</p>
+        <p style={{margin:0,fontSize:11,color:th.textMuted,lineHeight:1.55}}>This view shows only current active pipeline work. Completed stages and completed boards are removed, so large done buckets like Welcome Call Complete or Thank You Call - Install Complete should not appear here. Green means the stage is comfortably inside its rotting goal, amber means it is getting close, and red means the stage average is running hot. Click any stage to see the active jobs inside it, how long they have been sitting, and the best available note or movement readout.</p>
+      </div>
       <div style={{overflowX:"auto",marginBottom:"1rem"}}>
-        {memberBoards.slice(0,8).map(function(bName){
+        {speedBoards.map(function(bName){
           var b=pd.boards[bName];if(!b)return null;
-          var stages=Object.values(b.stages).filter(function(s){return s.jobCount>0;});
+          var stages=heatmapStagesFor(bName);
           return <div key={bName} style={{marginBottom:8}}>
             <p style={{margin:"0 0 4px",fontSize:12,fontWeight:500,color:th.text}}>{bName} <span style={{fontSize:11,color:th.textMuted}}>({b.jobCount} jobs, {b.avgDays}d avg)</span></p>
             <div style={{display:"flex",gap:3,flexWrap:"wrap"}}>
@@ -731,13 +810,14 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
                   {isExp&&<div style={{background:th.card,border:"1px solid "+th.border,borderRadius:8,padding:"8px 10px",marginTop:3,minWidth:220}}>
                     <p style={{margin:"0 0 6px",fontSize:11,fontWeight:500,color:th.text}}>{s.name} &mdash; {s.jobCount} jobs, avg {s.avgDays}d</p>
                     <p style={{margin:"0 0 6px",fontSize:11,color:th.textMuted}}>Threshold: {s.threshold?s.threshold+"d":"none"}</p>
-                    {s.deals.slice(0,4).map(function(d){return <DealCard key={d.id} deal={d} threshold={s.threshold} th={th}/>;})}
+                    {s.deals.map(function(d){return <DealCard key={d.id} deal={d} threshold={s.threshold} th={th}/>;})}
                   </div>}
                 </div>;
               })}
             </div>
           </div>;
         })}
+        {speedBoards.length===0&&<p style={{margin:0,fontSize:12,color:C.green}}>No current active stages to show. Completed stages and completed boards are excluded from this heat map.</p>}
       </div>
     </div>}
 
@@ -753,7 +833,7 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
       </div>
 
       <p style={{margin:"0 0 8px",fontSize:12,fontWeight:500,color:th.text}}>Top bottlenecks ({pd.bottlenecks.length} detected)</p>
-      <p style={{margin:"0 0 12px",fontSize:11,color:th.textMuted}}>Stages where average days exceeds the board average by 50% or more. Real Pipedrive data.</p>
+      <p style={{margin:"0 0 12px",fontSize:11,color:th.textMuted}}>Current active stages where average days exceeds the configured rotting goal. Completed/terminal stages are excluded.</p>
       <div style={{display:"flex",flexDirection:"column",gap:5,marginBottom:"1.5rem"}}>
         {pd.bottlenecks.slice(0,10).map(function(bn,i){
           var severity=bn.pctAbove>=80?C.red:bn.pctAbove>=50?C.amber:C.orange;
@@ -765,12 +845,12 @@ function IntelligenceTab({pd,member,role,th,kpiTags,onAiSummary,aiSummary,summar
             </div>
             <div style={{textAlign:"right"}}>
               <p style={{margin:0,fontSize:12,fontWeight:500,color:severity}}>{bn.avgDays}d avg</p>
-              <p style={{margin:0,fontSize:11,color:th.textMuted}}>board: {bn.boardAvg}d (+{bn.pctAbove}%)</p>
+              <p style={{margin:0,fontSize:11,color:th.textMuted}}>goal: {bn.threshold}d (+{bn.pctAbove}%)</p>
             </div>
             <span style={{fontSize:11,color:C.red,background:C.red+"18",padding:"2px 7px",borderRadius:8,fontWeight:500}}>{bn.stuckCount} deals</span>
           </div>;
         })}
-        {pd.bottlenecks.length===0&&<p style={{margin:0,fontSize:13,color:C.green}}>✓ No significant bottlenecks detected. All stages within 50% of their board average.</p>}
+        {pd.bottlenecks.length===0&&<p style={{margin:0,fontSize:13,color:C.green}}>✓ No significant bottlenecks detected. Current active stages are within configured rotting goals.</p>}
       </div>
 
       {showRepData&&<div>
@@ -1042,7 +1122,9 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
   var iS={background:th.inputBg,border:"1px solid "+th.inputBorder,borderRadius:10,color:th.selectText,fontSize:13,padding:"8px 11px",outline:"none",fontFamily:"inherit",boxSizing:"border-box" as const};
 
   // Derive admin status from session email (case-insensitive match)
-  var isAdmin=ADMIN_EMAILS.indexOf((session.email||"").toLowerCase())>=0;
+  var emailLc=(session.email||"").toLowerCase();
+  var isAdmin=ADMIN_EMAILS.indexOf(emailLc)>=0;
+  var isBackendAdmin=emailLc==="stephen@unicityhome.com";
 
   // Core state
   var [tab,setTab]=useState("Overview");
@@ -1133,14 +1215,15 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
   var [copied,setCopied]=useState(false);
   var RANGE_OPTS=[{d:30,l:"30d"},{d:60,l:"60d"},{d:90,l:"90d"},{d:180,l:"6mo"},{d:365,l:"1yr"},{d:730,l:"All"}];
   var METRIC_LABELS={totalActiveJobs:"Active jobs",totalPipelineValue:"Pipeline value",endToEndDays:"End-to-end days",wonThisWeek:"Won this week",wonLast30d:"Won last 30d",lostLast30d:"Lost last 30d",cancellationRate30d:"Cancellation rate (30d)",activitiesOverdue:"Overdue activities",callsDueToday:"Calls due today",installsScheduledThisWeek:"Installs scheduled (wk)",permitsSubmittedThisWeek:"Permits submitted (wk)",nmaSubmittedThisWeek:"NMA submitted (wk)"};
-  // Notes-extracted insight charts (red flags, cycle times) honour the active date range via per-window
+  // Notes-extracted insight charts (operational setbacks, cycle times) honour the active date range via per-window
   // buckets in OPS_INSIGHTS.windows; "All" (730) and any non-bucketed range fall back to all-time figures.
   function opsWin(days){var w=OPS_INSIGHTS.windows&&OPS_INSIGHTS.windows[String(days)];return w||{redFlags:OPS_INSIGHTS.redFlags,cycleTimes:OPS_INSIGHTS.cycleTimes};}
-  // Reporting-sheet windows (win/cancel/inspection-fail rates, by board-event date) follow the same range pills;
+  // Reporting-sheet windows (win/cancel/inspection Red-Tag rates, by board-event date) follow the same range pills;
   // "All" (730) / non-bucketed falls back to the all-time funnel + cancellation + inspection figures.
   function repWin(days){var r=OPS_INSIGHTS.reporting;var w=r&&r.windows&&r.windows[String(days)];return w||{winRate:OPS_INSIGHTS.funnel.winRate,cancelRate:OPS_INSIGHTS.cancellations.ratePctOfResolved,completed:OPS_INSIGHTS.funnel.ptoReached,cancelled:OPS_INSIGHTS.funnel.cancelled,inspectionFailRate:OPS_INSIGHTS.inspections.failRatePct,inspectionEvents:OPS_INSIGHTS.inspections.events};}
-  // Red-flag rows: label = display group, value = group total, tip = fine-category breakdown (hover).
-  function rfChartData(cats){return (cats||[]).map(function(c){var subs=c.subcategories||[];return {label:String(c.category).replace(/_/g," "),value:c.count,tip:String(c.category)+": "+Number(c.count).toLocaleString()+" flags"+(subs.length?"\n"+subs.map(function(s){return "  • "+String(s.category).replace(/_/g," ")+": "+Number(s.count).toLocaleString();}).join("\n"):"")};});}
+  function setbackLabel(category){var c=String(category);if(c==="inspection_failure")return "Inspection Red-Tags";if(c==="documentation_blocker"||c==="permitting_compliance")return "Permitting application setbacks";return c.replace(/_/g," ");}
+  // Setback rows: label = display group, value = group total, tip = fine-category breakdown (hover).
+  function rfChartData(cats){return (cats||[]).map(function(c){var subs=c.subcategories||[];return {label:setbackLabel(c.category),value:c.count,tip:setbackLabel(c.category)+": "+Number(c.count).toLocaleString()+" setbacks"+(subs.length?"\n"+subs.map(function(s){return "  • "+setbackLabel(s.category)+": "+Number(s.count).toLocaleString();}).join("\n"):"")};});}
   var ow=opsWin(fltDays);
   var rw=repWin(fltDays);
   var owIsAll=!(OPS_INSIGHTS.windows&&OPS_INSIGHTS.windows[String(fltDays)]);
@@ -1176,6 +1259,11 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
   var draftChanges=audit.filter(function(e){return e.draft;});
 
   function addAudit(action,detail,type){type=type||"system";setAudit(function(l){return [{id:Date.now(),ts:dmyTime(),user:"Stephen Farrell",action:action,detail:detail,type:type,draft:draft}].concat(l);});}
+  function addRalphIssue(obj){
+    var reporter=(session.name||session.email||"Dashboard user");
+    setRalph(function(l){return [{id:Date.now(),ts:dmyTime(),reporter:obj.reporter||reporter,issue:obj.issue,kpi:obj.kpi||"General / Other",bugType:obj.bugType||"Other",dataPoint:obj.dataPoint||"Not specified",context:obj.context||"",status:"open",stage:"R - Reported",correction:"",aiNote:""}].concat(l);});
+    addAudit("RALPH issue logged",(obj.bugType||"Other")+" - "+String(obj.issue||"").slice(0,50),"system");
+  }
   function updMember(i,u){setTeam(function(t){return t.map(function(x,idx){return idx===i?u:x;});});}
   function switchToDraft(){setDraft(true);addAudit("Switched to draft mode","Changes will not affect live send","system");}
   function pushToLive(){setDraft(false);setShowPush(false);setAudit(function(l){return l.map(function(e){return Object.assign({},e,{draft:false});});});addAudit("Pushed to live","All draft changes promoted","system");}
@@ -1489,10 +1577,14 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
     }
   }
 
-  var ALL_TABS=[{id:"Overview",icon:"ti-layout-dashboard",admin:false},{id:"Setup",icon:"ti-settings",admin:true},{id:"Team",icon:"ti-users",admin:false},{id:"Boards",icon:"ti-layout-board",admin:false},{id:"Intelligence",icon:"ti-brain",admin:false},{id:"Reports",icon:"ti-chart-bar",admin:false},{id:"Preview",icon:"ti-mail",admin:false},{id:"Send",icon:"ti-send",admin:true},{id:"Audit",icon:"ti-history",admin:true},{id:"RALPH",icon:"ti-circuit-board",admin:true}];
-  var TABS=ALL_TABS.filter(function(t){return isAdmin||!t.admin;});
+  var ALL_TABS=[{id:"Overview",label:"Home",icon:"ti-layout-dashboard",admin:false},{id:"Reports",label:"Reports",icon:"ti-chart-bar",admin:false},{id:"Intelligence",label:"Intelligence",icon:"ti-brain",admin:false},{id:"Boards",label:"Board Health",icon:"ti-layout-board",admin:false},{id:"Team",label:"Team Access",icon:"ti-users",admin:true,backendOnly:true},{id:"Preview",label:"Email Preview",icon:"ti-mail",admin:true,backendOnly:true},{id:"Setup",label:"Settings",icon:"ti-settings",admin:true,backendOnly:true},{id:"Send",label:"Manual Send",icon:"ti-send",admin:true,backendOnly:true},{id:"Audit",label:"Audit Log",icon:"ti-history",admin:true,backendOnly:true},{id:"RALPH",label:"RALPH Issues",icon:"ti-circuit-board",admin:true,backendOnly:true}];
+  var TABS=ALL_TABS.filter(function(t){return t.backendOnly?isBackendAdmin:(isAdmin||!t.admin);});
   var ICON_OF={}; ALL_TABS.forEach(function(t){ICON_OF[t.id]=t.icon;});
-  var NAV_GROUPS=[{label:"",items:["Overview"]},{label:"Analytics",items:["Reports","Intelligence","Boards"]},{label:"People",items:["Team","Preview"]},{label:"System",items:["Setup","Send","Audit","RALPH"]}];
+  var LABEL_OF={}; ALL_TABS.forEach(function(t){LABEL_OF[t.id]=t.label||t.id;});
+  var NAV_GROUPS=[{label:"Home",items:["Overview"]},{label:"Pipeline Insights",items:["Reports","Intelligence","Boards"]},{label:"Back-End Tools",backendOnly:true,items:["Team","Preview","Setup","Send","Audit","RALPH"]}];
+  var allowedTabIds=TABS.map(function(t){return t.id;});
+  var allowedTabKey=allowedTabIds.join("|");
+  useEffect(function(){if(allowedTabKey.split("|").indexOf(tab)<0)setTab("Overview");},[tab,allowedTabKey]);
 
   function getDept(r){if(["Owner","COO","VP of Operations","Office Manager","Office Administrator","Installation Manager","Warehouse Manager","Service Manager","Service Coordinator","Engineering Coordinator","Permitting Coordinator","Scheduling Coordinator","Inspection Coordinator","Net Metering Coordinator","Receptionist"].indexOf(r)>=0)return"Operations";if(["President of Sales","Sales Relations Manager","Account Manager","After Hours Account Manager","Onboarding Coordinator"].indexOf(r)>=0)return"Sales";if(["Accounting Manager","Commissions Coordinator","Director of Finance","Funding Coordinator"].indexOf(r)>=0)return"Finance";return"AI";}
 
@@ -1502,18 +1594,18 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
   return <div className={dark?"theme-dark":"theme-light"} style={{minHeight:"100vh",background:th.bg,fontFamily:"var(--font-sans)",position:"relative",display:"flex"}}>
     {boardEdit!==null&&<BoardModal member={team[boardEdit]} allBoards={allBoards} onSave={function(nb){addAudit("Board access updated",team[boardEdit].name+" boards updated","access");updMember(boardEdit,Object.assign({},team[boardEdit],{boards:nb}));setBoardEdit(null);}} onClose={function(){setBoardEdit(null);}} th={th}/>}
     {showPush&&<PushModal draftChanges={draftChanges} team={team} onConfirm={pushToLive} onCancel={function(){setShowPush(false);}} th={th}/>}
-    {kpiDrillKpi&&<KpiDrillDown kpiName={kpiDrillKpi} pd={pd} memberBoards={drillBoards||(team[prevPerson]?team[prevPerson].boards:Object.keys(BOARDS))} role={team[prevPerson]?team[prevPerson].role:"Owner"} onClose={function(){setKpiDrillKpi(null);setDrillBoards(null);}} th={th} onNavigateIntelligence={function(sub){setKpiDrillKpi(null);setDrillBoards(null);setTab("Intelligence");setIntelSub(sub);}}/>}
+    {kpiDrillKpi&&<KpiDrillDown kpiName={kpiDrillKpi} pd={pd} memberBoards={drillBoards||(team[prevPerson]?team[prevPerson].boards:Object.keys(BOARDS))} role={team[prevPerson]?team[prevPerson].role:"Owner"} onClose={function(){setKpiDrillKpi(null);setDrillBoards(null);}} th={th} onNavigateIntelligence={function(sub){setKpiDrillKpi(null);setDrillBoards(null);setTab("Intelligence");setIntelSub(sub);}} onReportBug={addRalphIssue}/>}
 
     {/* Sidebar nav (rebuild step 2) */}
-    <aside style={{width:212,flexShrink:0,minHeight:"100vh",background:th.tabBg,borderRight:"1px solid "+th.borderPlain,display:"flex",flexDirection:"column",gap:2,padding:"16px 12px",boxSizing:"border-box"}}>
+    <aside style={{width:228,flexShrink:0,minHeight:"100vh",background:th.tabBg,borderRight:"1px solid "+th.borderPlain,display:"flex",flexDirection:"column",gap:6,padding:"16px 12px",boxSizing:"border-box"}}>
       <div style={{display:"flex",alignItems:"center",gap:9,padding:"4px 8px 14px"}}>
         <UniLogo/>
         <div style={{display:"flex",alignItems:"baseline",gap:5}}><span style={{fontSize:15,fontWeight:600,color:th.text}}>Unicity</span><span style={{fontSize:15,fontWeight:600,color:C.orange}}>KPI</span></div>
       </div>
-      {NAV_GROUPS.map(function(g){var items=g.items.filter(function(id){return TABS.some(function(t){return t.id===id;});});if(!items.length)return null;return <div key={g.label||"top"}>
-        {g.label?<div style={{fontSize:10,letterSpacing:"0.8px",color:th.textMuted,padding:"10px 8px 4px",textTransform:"uppercase" as const}}>{g.label}</div>:null}
-        {items.map(function(id){var a=tab===id;return <button key={id} onClick={function(){setTab(id);}} style={{width:"100%",display:"flex",alignItems:"center",gap:9,padding:"8px 10px",border:"none",borderRadius:8,background:a?C.orange+"22":"transparent",color:a?C.orange:th.text,fontWeight:a?500:400,fontSize:12.5,cursor:"pointer",textAlign:"left" as const,marginBottom:1}}>
-          <i className={"ti "+ICON_OF[id]} style={{fontSize:16,flexShrink:0}} aria-hidden="true"/>{id}
+      {NAV_GROUPS.filter(function(g){return !g.backendOnly||isBackendAdmin;}).map(function(g){var items=g.items.filter(function(id){return TABS.some(function(t){return t.id===id;});});if(!items.length)return null;return <div key={g.label||"top"} style={{marginBottom:4}}>
+        <div style={{fontSize:10,letterSpacing:"0.9px",color:th.textMuted,padding:"10px 8px 6px",textTransform:"uppercase" as const,fontWeight:600}}>{g.label}</div>
+        {items.map(function(id){var a=tab===id;return <button key={id} onClick={function(){setTab(id);}} style={{width:"100%",display:"flex",alignItems:"center",gap:10,padding:"9px 11px",border:"1px solid "+(a?C.orange+"66":th.borderPlain),borderRadius:11,background:a?"linear-gradient(135deg,"+C.orange+"26,"+C.orangeDeep+"18)":th.inputBg,color:a?C.orange:th.text,fontWeight:a?600:500,fontSize:12.5,cursor:"pointer",textAlign:"left" as const,marginBottom:6,boxShadow:a?"0 10px 24px rgba(242,143,29,0.18), 0 2px 8px rgba(0,0,0,0.22)":"0 5px 14px rgba(0,0,0,0.16)",transform:a?"translateX(3px)":"translateX(0)",transition:"background 120ms ease, border-color 120ms ease, transform 120ms ease, box-shadow 120ms ease"}}>
+          <i className={"ti "+ICON_OF[id]} style={{fontSize:16,flexShrink:0}} aria-hidden="true"/>{LABEL_OF[id]||id}
         </button>;})}
       </div>;})}
       <div style={{marginTop:"auto",padding:"10px 8px 2px",fontSize:10.5,color:th.textMuted,borderTop:"1px solid "+th.borderPlain}}>Briefing system v8</div>
@@ -1544,7 +1636,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
       </div>
     </div>
 
-    {/* Cron send-state + draft/live publish banners moved to the Setup page (System tab). */}
+    {/* Cron send-state + draft/live publish banners moved to the backend Settings page. */}
 
     <div style={{background:C.green+"0a",border:"1px solid "+C.green+"22",borderRadius:12,padding:"7px 14px",marginBottom:"1rem"}}>
       <p style={{margin:0,fontSize:12,color:C.green}}>Read-only mode. Pipedrive GET endpoints only. Google OAuth: gmail.send + gmail.readonly. No data is modified.</p>
@@ -1581,7 +1673,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
           {l:"Win rate",v:OPS_INSIGHTS.funnel.winRate+"%",c:OPS_INSIGHTS.funnel.winRate>=70?cc.green:cc.amber,s:OPS_INSIGHTS.funnel.resolved.toLocaleString()+" resolved"},
           {l:"Cancellation rate",v:OPS_INSIGHTS.cancellations.ratePctOfResolved+"%",c:OPS_INSIGHTS.cancellations.ratePctOfResolved>30?cc.red:OPS_INSIGHTS.cancellations.ratePctOfResolved>15?cc.amber:cc.green,s:"median "+OPS_INSIGHTS.cancellations.medianDaysToCancel+"d to cancel"},
           {l:"Median cycle → PTO",v:(ow.cycleTimes[0].median!=null?ow.cycleTimes[0].median+"d":"—"),c:th.text,s:"contract → PTO · "+owLabel},
-          {l:"Inspection fail rate",v:OPS_INSIGHTS.inspections.failRatePct+"%",c:OPS_INSIGHTS.inspections.failRatePct>30?cc.red:OPS_INSIGHTS.inspections.failRatePct>15?cc.amber:cc.green,s:OPS_INSIGHTS.inspections.failures.toLocaleString()+" failures"}
+          {l:"Inspection Red-Tag rate",v:OPS_INSIGHTS.inspections.failRatePct+"%",c:OPS_INSIGHTS.inspections.failRatePct>30?cc.red:OPS_INSIGHTS.inspections.failRatePct>15?cc.amber:cc.green,s:OPS_INSIGHTS.inspections.failures.toLocaleString()+" inspection Red-Tags"}
         ].map(function(card,i){return <div key={i} onClick={function(){setDrillBoards(null);setKpiDrillKpi(card.l+" — "+card.v);}} title="Click to drill into the underlying jobs" style={Object.assign({},glass,{padding:"0.9rem 1.1rem",cursor:"pointer"})}>
           <p style={{margin:"0 0 5px",fontSize:11,color:th.textMuted}}>{card.l}</p>
           <p style={{margin:0,fontSize:25,fontWeight:600,color:card.c}}>{card.v}</p>
@@ -1616,8 +1708,8 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
       </div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
         <div style={glass}>
-          <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Top red-flag categories</p>
-          <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>{ow.redFlags.total.toLocaleString()} flags &middot; {owLabel}</p>
+          <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Top setback categories</p>
+          <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Inspection Red-Tags are code failures issued by a municipality during inspections. Permit declines, missing documents, and application corrections are permitting setbacks. {ow.redFlags.total.toLocaleString()} setbacks &middot; {owLabel}</p>
           <BarChart th={th} color={cc.red} data={rfChartData(ow.redFlags.categories.slice(0,6))}/>
         </div>
         <div style={glass}>
@@ -1629,7 +1721,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
     </div>}
 
     {/* SETUP */}
-    {isAdmin&&tab==="Setup"&&<div>
+    {isBackendAdmin&&tab==="Setup"&&<div>
       {/* Mode banners (relocated from the global header): cron send state + draft/live publish control */}
       <CronStatusBanner status={cronStatus} th={th}/>
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:"1rem",padding:"10px 16px",borderRadius:12,background:draft?C.amber+"12":C.green+"0d",border:"2px solid "+(draft?C.amber:C.green)+"44"}}>
@@ -1705,7 +1797,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
     </div>}
 
     {/* TEAM */}
-    {tab==="Team"&&<div>
+    {isBackendAdmin&&tab==="Team"&&<div>
       <div style={{display:"flex",gap:8,marginBottom:"1rem",flexWrap:"wrap"}}>
         <input value={tSearch} onChange={function(e){setTSearch(e.target.value);}} placeholder="Search team..." style={Object.assign({},iS,{flex:1,minWidth:150})}/>
         <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
@@ -1776,13 +1868,13 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
     {/* REPORTS — charts & analytics (Increment 1: charts + red-flag categories + RAG + CSV) */}
     {tab==="Reports"&&<div>
       <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:"1rem",flexWrap:"wrap"}}>
-        <p style={{margin:0,fontSize:13,color:th.textMuted,flex:1}}>Visual KPI reports. Live pipeline from Pipedrive; operational insights from the notes-extraction pipeline.</p>
+        <p style={{margin:0,fontSize:13,color:th.textMuted,flex:1}}>Visual KPI reports. Inspection Red-Tags are municipality-issued inspection/code failures; permitting declines or missing documentation are permitting application setbacks.</p>
         <span style={{fontSize:11,color:th.textMuted}}>Insights range</span>
         <div style={{display:"flex",gap:4,background:th.tabBg,border:"1px solid "+th.borderPlain,borderRadius:10,padding:3}}>
           {RANGE_OPTS.map(function(o){var a=fltDays===o.d;return <button key={o.d} onClick={function(){setFltDays(o.d);}} style={{fontSize:11,padding:"6px 11px",borderRadius:8,border:"none",cursor:"pointer",background:a?C.orange+"22":"transparent",color:a?C.orange:th.textMuted,fontWeight:a?500:400}}>{o.l}</button>;})}
         </div>
         <span style={{fontSize:11,color:th.textMuted,background:th.inputBg,border:"1px solid "+th.borderPlain,borderRadius:20,padding:"4px 10px"}}><i className="ti ti-clock" style={{fontSize:12,marginRight:4}} aria-hidden="true"/>Insights through {dmy(OPS_INSIGHTS.dataFreshThrough)}</span>
-        <button onClick={function(){dlCSV(ow.redFlags.categories.map(function(c){return {category:c.category,count:c.count};}),"red-flag-categories-"+(owIsAll?"all":fltDays+"d")+"-"+todayStr()+".csv");}} style={{display:"flex",alignItems:"center",gap:5,background:th.inputBg,border:"1px solid "+th.borderPlain,borderRadius:20,padding:"7px 14px",color:th.textMuted,fontSize:11,cursor:"pointer"}}><i className="ti ti-download" style={{fontSize:13}} aria-hidden="true"/>Export CSV</button>
+        <button onClick={function(){dlCSV(ow.redFlags.categories.map(function(c){return {category:setbackLabel(c.category),sourceCategory:c.category,count:c.count};}),"setback-categories-"+(owIsAll?"all":fltDays+"d")+"-"+todayStr()+".csv");}} style={{display:"flex",alignItems:"center",gap:5,background:th.inputBg,border:"1px solid "+th.borderPlain,borderRadius:20,padding:"7px 14px",color:th.textMuted,fontSize:11,cursor:"pointer"}}><i className="ti ti-download" style={{fontSize:13}} aria-hidden="true"/>Export CSV</button>
       </div>
 
       {/* Live KPIs vs period — range control + period-over-period deltas + targets/RAG (Increment 2) */}
@@ -1839,7 +1931,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
           {l:"Active jobs (current)",v:Number(pd.totalActiveJobs||0).toLocaleString(),c:th.text,s:"open jobs in active stages now"},
           {l:"Win rate ("+owLabel+")",v:(rw.winRate==null?"-":rw.winRate+"%"),c:(rw.winRate>=70?cc.green:cc.amber),s:Number(rw.completed||0).toLocaleString()+" completed / "+Number(rw.cancelled||0).toLocaleString()+" cancelled"},
           {l:"Cancellation rate ("+owLabel+")",v:(rw.cancelRate==null?"-":rw.cancelRate+"%"),c:(rw.cancelRate>30?cc.red:rw.cancelRate>15?cc.amber:cc.green),s:Number(rw.cancelled||0).toLocaleString()+" cancelled"},
-          {l:"Inspection fail ("+owLabel+")",v:(rw.inspectionFailRate==null?"-":rw.inspectionFailRate+"%"),c:(rw.inspectionFailRate>30?cc.red:rw.inspectionFailRate>15?cc.amber:cc.green),s:Number(rw.inspectionEvents||0).toLocaleString()+" inspections"},
+          {l:"Inspection Red-Tags ("+owLabel+")",v:(rw.inspectionFailRate==null?"-":rw.inspectionFailRate+"%"),c:(rw.inspectionFailRate>30?cc.red:rw.inspectionFailRate>15?cc.amber:cc.green),s:Number(rw.inspectionEvents||0).toLocaleString()+" inspections"},
           {l:"Avg truck rolls / completed job",v:String(OPS_INSIGHTS.truckRolls.meanPerCompletedJob),c:th.text,s:Number(OPS_INSIGHTS.truckRolls.completedJobs||0).toLocaleString()+" completed jobs (PTO reached)"},
           {l:"Clawback at risk (active)",v:Number(OPS_INSIGHTS.reporting.clawbackActive||0).toLocaleString(),c:cc.red,s:Number(OPS_INSIGHTS.reporting.clawbackAtRiskTotal||0).toLocaleString()+" ever flagged"},
         ].map(function(card,i){return <div key={i} style={Object.assign({},glass,{padding:"0.9rem 1rem"})}>
@@ -1851,8 +1943,8 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
 
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(330px,1fr))",gap:10}}>
         <div style={glass}>
-          <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Red-flag categories</p>
-          <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>{ow.redFlags.total.toLocaleString()} flags across {ow.redFlags.records.toLocaleString()} jobs &middot; {owLabel}</p>
+          <p style={{margin:"0 0 2px",fontSize:14,fontWeight:500,color:th.text}}>Setback categories</p>
+          <p style={{margin:"0 0 10px",fontSize:11,color:th.textMuted}}>Red-Tags are inspection-only. Permitting application issues are tracked separately as permitting setbacks. {ow.redFlags.total.toLocaleString()} setbacks across {ow.redFlags.records.toLocaleString()} jobs &middot; {owLabel}</p>
           <BarChart th={th} color={cc.red} data={rfChartData(ow.redFlags.categories)}/>
         </div>
 
@@ -1895,7 +1987,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
     </div>}
 
     {/* PREVIEW */}
-    {tab==="Preview"&&<div>
+    {isBackendAdmin&&tab==="Preview"&&<div>
       <div style={{background:liveApiData?C.green+"0d":C.amber+"0d",border:"1px solid "+(liveApiData?C.green:C.amber)+"22",borderRadius:10,padding:"8px 14px",marginBottom:"1rem"}}>
         <p style={{margin:0,fontSize:12,color:liveApiData?C.green:C.amber}}>{liveApiData?"Live data active - "+pd.totalActiveJobs+" jobs":"No live data - previews use simulated numbers."}</p>
       </div>
@@ -1928,7 +2020,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
     </div>}
 
     {/* SEND */}
-    {isAdmin&&tab==="Send"&&<div style={{display:"flex",flexDirection:"column",gap:"1rem"}}>
+    {isBackendAdmin&&tab==="Send"&&<div style={{display:"flex",flexDirection:"column",gap:"1rem"}}>
       <div style={glass}>
         <SLabel icon="ti-clock-play" text="Automated schedule"/>
         <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:10}}>
@@ -1969,7 +2061,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
     </div>}
 
     {/* AUDIT */}
-    {isAdmin&&tab==="Audit"&&<div>
+    {isBackendAdmin&&tab==="Audit"&&<div>
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:"1rem",flexWrap:"wrap"}}>
         <p style={{margin:0,fontSize:13,color:th.textMuted,flex:1}}>{audit.length} entries</p>
         <button onClick={function(){dlCSV(audit,"unicity-audit-"+todayStr()+".csv");}} style={{background:C.blue+"18",border:"1px solid "+C.blue+"44",borderRadius:8,color:C.blue,fontSize:11,fontWeight:500,padding:"6px 12px",cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><i className="ti ti-download" style={{fontSize:13}} aria-hidden="true"/>CSV</button>
@@ -1994,7 +2086,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
     </div>}
 
     {/* RALPH */}
-    {isAdmin&&tab==="RALPH"&&<div>
+    {isBackendAdmin&&tab==="RALPH"&&<div>
       <div style={Object.assign({},glass,{marginBottom:"1rem",background:C.purple+"0a",borderColor:C.purple+"30"})}>
         <p style={{margin:0,fontSize:13,fontWeight:500,color:C.purple}}>RALPH - Repair, Annotate, Learn, Patch, Harden</p>
         <p style={{margin:0,fontSize:11,color:th.textMuted,marginTop:3}}>User feedback flows here. AI Engineers review, patch, and document fixes.</p>
@@ -2017,7 +2109,7 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
       </div>
       {showRalphForm&&<div style={{background:th.card,border:"1px solid "+C.purple+"44",borderRadius:14,padding:"1rem",marginBottom:"1rem"}}>
         <p style={{margin:"0 0 12px",fontSize:13,fontWeight:500,color:C.purple}}>Log new issue</p>
-        <RalphFormInline kpiTags={kpiTags} th={th} iS={iS} onSubmit={function(obj){setRalph(function(l){return [{id:Date.now(),ts:dmyTime(),reporter:obj.reporter,issue:obj.issue,kpi:obj.kpi,status:"open",stage:"R - Reported",correction:"",aiNote:""}].concat(l);});setShowRalphForm(false);addAudit("RALPH issue logged",obj.reporter+": "+obj.issue.slice(0,50),"system");}} onCancel={function(){setShowRalphForm(false);}}/>
+        <RalphFormInline kpiTags={kpiTags} th={th} iS={iS} onSubmit={function(obj){addRalphIssue(obj);setShowRalphForm(false);}} onCancel={function(){setShowRalphForm(false);}}/>
       </div>}
       <div style={{display:"flex",flexDirection:"column",gap:8}}>
         {ralph.map(function(r){var sc=r.stage.startsWith("R")?C.red:r.stage.startsWith("A")?C.amber:r.stage.startsWith("L")?C.blue:r.stage.startsWith("P")?C.orange:C.green;
@@ -2026,8 +2118,11 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
               <span style={{fontSize:12,fontWeight:500,color:th.text,flex:1}}>{r.issue}</span>
               <Pill text={r.stage} color={r.stage.startsWith("R")?"red":r.stage.startsWith("A")?"amber":"green"}/>
               <Pill text={r.status} color={r.status==="open"?"red":r.status==="patched"?"green":"amber"}/>
+              {r.bugType&&<Pill text={r.bugType} color="blue"/>}
             </div>
             <p style={{margin:"0 0 5px",fontSize:11,color:th.textMuted}}>KPI: <span style={{color:C.orange}}>{r.kpi}</span> - {r.reporter} - {r.ts}</p>
+            {r.dataPoint&&<p style={{margin:"0 0 5px",fontSize:11,color:th.textMuted}}>Tagged data point: <span style={{color:th.text}}>{r.dataPoint}</span></p>}
+            {r.context&&<p style={{margin:"0 0 5px",fontSize:11,color:th.textMuted}}>Context: {r.context}</p>}
             {r.correction&&<div style={{marginTop:6,padding:"6px 10px",background:C.green+"0d",border:"1px solid "+C.green+"22",borderRadius:7}}><p style={{margin:0,fontSize:11,color:C.green}}>Fix: {r.correction}</p></div>}
             {r.status==="open"&&<div style={{marginTop:9,display:"flex",gap:6}}>
               <button onClick={function(){setRalph(function(l){return l.map(function(x){return x.id===r.id?Object.assign({},x,{status:"in-review",stage:"A - Annotating"}):x;});});}} style={{background:C.amber+"18",border:"1px solid "+C.amber+"44",borderRadius:10,color:C.amber,fontWeight:500,fontSize:11,padding:"5px 12px",cursor:"pointer"}}>Review</button>
@@ -2043,10 +2138,16 @@ function Dashboard({session}:{session:{signedIn:boolean;email:string;name:string
 
 // Inline RALPH form to avoid hoisting issues
 function RalphFormInline({kpiTags,th,iS,onSubmit,onCancel}){
-  var [issue,setIssue]=useState("");var [kpi,setKpi]=useState(kpiTags[0]?kpiTags[0].name:"");var [reporter,setReporter]=useState("Stephen Farrell");
+  var [issue,setIssue]=useState("");var [kpi,setKpi]=useState(kpiTags[0]?kpiTags[0].name:"");var [reporter,setReporter]=useState("Stephen Farrell");var [bugType,setBugType]=useState(BUG_TYPES[0]);var [dataPoint,setDataPoint]=useState("General dashboard");
   return <div style={{display:"flex",flexDirection:"column",gap:8}}>
     <div><p style={{margin:"0 0 3px",fontSize:11,color:th.textMuted}}>Issue description</p>
       <textarea value={issue} onChange={function(e){setIssue(e.target.value);}} placeholder="Describe the issue..." rows={3} style={Object.assign({},iS,{width:"100%",resize:"vertical"})}/></div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:8}}>
+      <div><p style={{margin:"0 0 3px",fontSize:11,color:th.textMuted}}>Bug type</p>
+        <select value={bugType} onChange={function(e){setBugType(e.target.value);}} style={Object.assign({},iS,{width:"100%",background:th.selectBg})}>{BUG_TYPES.map(function(t){return <option key={t} style={{background:th.selectBg,color:th.selectText}}>{t}</option>;})}</select></div>
+      <div><p style={{margin:"0 0 3px",fontSize:11,color:th.textMuted}}>Tagged data point</p>
+        <input value={dataPoint} onChange={function(e){setDataPoint(e.target.value);}} placeholder="Example: Heat Map / Inspection" style={Object.assign({},iS,{width:"100%"})}/></div>
+    </div>
     <div><p style={{margin:"0 0 3px",fontSize:11,color:th.textMuted}}>Related KPI tag</p>
       <select value={kpi} onChange={function(e){setKpi(e.target.value);}} style={Object.assign({},iS,{width:"100%",background:th.selectBg})}>
         {kpiTags.map(function(t){return <option key={t.id} style={{background:th.selectBg,color:th.selectText}}>{t.name}</option>;})}
@@ -2055,7 +2156,7 @@ function RalphFormInline({kpiTags,th,iS,onSubmit,onCancel}){
     <div><p style={{margin:"0 0 3px",fontSize:11,color:th.textMuted}}>Reported by</p>
       <input value={reporter} onChange={function(e){setReporter(e.target.value);}} style={Object.assign({},iS,{width:"100%"})}/></div>
     <div style={{display:"flex",gap:8}}>
-      <button onClick={function(){if(issue.trim())onSubmit({issue:issue.trim(),kpi:kpi,reporter:reporter});}} style={{flex:1,background:"linear-gradient(135deg,"+C.orange+","+C.orangeDeep+")",border:"none",borderRadius:10,color:"#fff",fontWeight:500,fontSize:12,padding:"9px",cursor:"pointer"}}>Submit</button>
+      <button onClick={function(){if(issue.trim())onSubmit({issue:issue.trim(),kpi:kpi,reporter:reporter,bugType:bugType,dataPoint:dataPoint});}} style={{flex:1,background:"linear-gradient(135deg,"+C.orange+","+C.orangeDeep+")",border:"none",borderRadius:10,color:"#fff",fontWeight:500,fontSize:12,padding:"9px",cursor:"pointer"}}>Submit</button>
       <button onClick={onCancel} style={{flex:1,background:th.inputBg,border:"1px solid "+th.borderPlain,borderRadius:10,color:th.textMuted,fontWeight:500,fontSize:12,padding:"9px",cursor:"pointer"}}>Cancel</button>
     </div>
   </div>;
